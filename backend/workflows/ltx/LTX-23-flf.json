@@ -14,7 +14,7 @@
   },
   "5267": {
     "inputs": {
-      "download_links": "https://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/diffusion_models/ltx-2.3-22b-dev_transformer_only_fp8_scaled.safetensors diffusion_models\nhttps://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/text_encoders/ltx-2.3_text_projection_bf16.safetensors text_encoders\nhttps://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it.safetensors text_encoders\nhttps://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/vae/LTX23_video_vae_bf16.safetensors vae\nhttps://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/vae/LTX23_audio_vae_bf16.safetensors vae\nhttps://huggingface.co/valiantcat/LTX-2.3-Transition-LORA/resolve/main/ltx2.3-transition.safetensors loras\nhttps://huggingface.co/Lightricks/LTX-2.3/resolve/main/ltx-2.3-22b-distilled-lora-384.safetensors loras\nhttps://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control/resolve/main/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors loras\nhttps://huggingface.co/valiantcat/LTX-2.3-Transition-LORA/resolve/main/ltx2.3-transition.safetensors loras\nhttps://huggingface.co/jingheya/lotus-depth-g-v2-0-disparity/resolve/main/unet/diffusion_pytorch_model.safetensors unet lotus-depth-g-v2-0-disparity.safetensors\nhttps://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors vae",
+      "download_links": "https://huggingface.co/Lightricks/LTX-2.3/resolve/main/ltx-2.3-22b-dev.safetensors checkpoints\nhttps://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/diffusion_models/ltx-2.3-22b-dev_transformer_only_fp8_scaled.safetensors diffusion_models\nhttps://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/text_encoders/ltx-2.3_text_projection_bf16.safetensors text_encoders\nhttps://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it.safetensors text_encoders\nhttps://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/vae/LTX23_video_vae_bf16.safetensors vae\nhttps://huggingface.co/Kijai/LTX2.3_comfy/resolve/main/vae/LTX23_audio_vae_bf16.safetensors vae\nhttps://huggingface.co/valiantcat/LTX-2.3-Transition-LORA/resolve/main/ltx2.3-transition.safetensors loras\nhttps://huggingface.co/Lightricks/LTX-2.3/resolve/main/ltx-2.3-22b-distilled-lora-384.safetensors loras\nhttps://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control/resolve/main/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors loras\nhttps://huggingface.co/valiantcat/LTX-2.3-Transition-LORA/resolve/main/ltx2.3-transition.safetensors loras\nhttps://huggingface.co/jingheya/lotus-depth-g-v2-0-disparity/resolve/main/unet/diffusion_pytorch_model.safetensors unet lotus-depth-g-v2-0-disparity.safetensors\nhttps://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors vae",
       "auto_download": true,
       "max_concurrent_downloads": 3,
       "max_download_speed_mbps": 0,
@@ -90,11 +90,13 @@
   },
   "5616": {
     "inputs": {
-      "vae_name": "LTX23_video_vae_bf16.safetensors"
+      "vae_name": "LTX23_video_vae_bf16.safetensors",
+      "device": "main_device",
+      "weight_dtype": "bf16"
     },
-    "class_type": "VAELoader",
+    "class_type": "VAELoaderKJ",
     "_meta": {
-      "title": "Load VAE"
+      "title": "VAELoader KJ"
     }
   },
   "5617": {
@@ -219,8 +221,8 @@
         2
       ],
       "vae": [
-        "5616",
-        0
+        "5649",
+        2
       ]
     },
     "class_type": "VAEDecodeTiled",
@@ -270,8 +272,8 @@
     "inputs": {
       "text": "blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, grainy texture, poor lighting, flickering, motion blur, distorted proportions, unnatural skin tones, deformed facial features, asymmetrical face, missing facial features, extra limbs, disfigured hands, wrong hand count, artifacts around text, unreadable text on shirt or hat, incorrect lettering on cap (“PNTR”), incorrect t-shirt slogan (“JUST DO IT”), missing microphone, misplaced microphone, inconsistent perspective, camera shake, incorrect depth of field, background too sharp, background clutter, distracting reflections, harsh shadows, inconsistent lighting direction, color banding, cartoonish rendering, 3D CGI look, unrealistic materials, uncanny valley effect, incorrect ethnicity, wrong gender, exaggerated expressions, smiling, laughing, exaggerated sadness, wrong gaze direction, eyes looking at camera, mismatched lip sync, silent or muted audio, distorted voice, robotic voice, echo, background noise, off-sync audio, missing sniff sounds, incorrect dialogue, added dialogue, repetitive speech, jittery movement, awkward pauses, incorrect timing, unnatural transitions, inconsistent framing, tilted camera, missing door or shelves, missing shallow depth of field, flat lighting, inconsistent tone, cinematic oversaturation, stylized filters, or AI artifacts.",
       "clip": [
-        "5617",
-        0
+        "5618",
+        1
       ]
     },
     "class_type": "CLIPTextEncode",
@@ -330,8 +332,8 @@
         1
       ],
       "vae": [
-        "5616",
-        0
+        "5649",
+        2
       ],
       "latent": [
         "5633",
@@ -416,8 +418,8 @@
         1
       ],
       "vae": [
-        "5616",
-        0
+        "5649",
+        2
       ],
       "latent": [
         "5630",
@@ -493,14 +495,14 @@
   "5639": {
     "inputs": {
       "expression": "a",
-      "values.a": [
+      "a": [
         "5656",
         0
       ]
     },
-    "class_type": "ComfyMathExpression",
+    "class_type": "MathExpression|pysssss",
     "_meta": {
-      "title": "Math Expression"
+      "title": "Math Expression 🐍"
     }
   },
   "5640": {
@@ -530,7 +532,7 @@
   "5643": {
     "inputs": {
       "frame_rate": [
-        "5639",
+        "5657",
         0
       ],
       "positive": [
@@ -551,8 +553,8 @@
     "inputs": {
       "text": "a woman waving her hair snap her finger, and turns in to another woman, a smoke effect helping to transform",
       "clip": [
-        "5617",
-        0
+        "5618",
+        1
       ]
     },
     "class_type": "CLIPTextEncode",
@@ -584,7 +586,7 @@
   "5647": {
     "inputs": {
       "frame_rate": [
-        "5639",
+        "5657",
         0
       ],
       "loop_count": 0,
@@ -612,12 +614,11 @@
   },
   "5649": {
     "inputs": {
-      "unet_name": "ltx-2.3-22b-dev_transformer_only_fp8_scaled.safetensors",
-      "weight_dtype": "default"
+      "ckpt_name": "ltx-2.3-22b-dev.safetensors"
     },
-    "class_type": "UNETLoader",
+    "class_type": "CheckpointLoaderSimple",
     "_meta": {
-      "title": "Load Diffusion Model"
+      "title": "Load Checkpoint"
     }
   },
   "5650": {
@@ -651,6 +652,15 @@
       "value": 24
     },
     "class_type": "easy int",
+    "_meta": {
+      "title": "FRAME RATE"
+    }
+  },
+  "5657": {
+    "inputs": {
+      "value": 24
+    },
+    "class_type": "FloatConstant",
     "_meta": {
       "title": "FRAME RATE"
     }

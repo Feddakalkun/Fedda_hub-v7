@@ -143,6 +143,10 @@ class CivitaiKeyRequest(BaseModel):
     api_key: str
 
 
+class HuggingFaceTokenRequest(BaseModel):
+    token: str
+
+
 @app.post("/api/settings/civitai-key")
 async def set_civitai_key(req: CivitaiKeyRequest):
     try:
@@ -160,6 +164,27 @@ async def get_civitai_key_status():
         data = load_settings()
         has_key = bool((data.get("civitai_api_key") or "").strip())
         return {"success": True, "configured": has_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/settings/hf-token")
+async def set_hf_token(req: HuggingFaceTokenRequest):
+    try:
+        data = load_settings()
+        data["hf_token"] = req.token.strip()
+        save_settings(data)
+        return {"success": True, "configured": bool(data["hf_token"])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/settings/hf-token/status")
+async def get_hf_token_status():
+    try:
+        data = load_settings()
+        has_token = bool((data.get("hf_token") or "").strip())
+        return {"success": True, "configured": has_token}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

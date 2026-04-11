@@ -519,7 +519,6 @@ try {
 } catch {}
 
 Write-Step "All Python dependencies installed." "Green"
-Install-MockingbirdRuntime -RootPath $RootPath -SpeakerSource (Join-Path $RootPath "assets\audio-tts\charlotte\charlotte.wav")
 
 # ============================================================================
 # 4. CUSTOM NODES
@@ -702,6 +701,13 @@ function Install-MockingbirdRuntime {
     }
 
     Write-Step "Mockingbird XTTS runtime ready." "Green"
+}
+
+try {
+    Install-MockingbirdRuntime -RootPath $RootPath -SpeakerSource (Join-Path $RootPath "assets\audio-tts\charlotte\charlotte.wav")
+} catch {
+    Write-Step "WARNING: Mockingbird runtime setup failed: $($_.Exception.Message)" "Yellow"
+    Write-Step "Continuing install without bundled XTTS runtime." "Yellow"
 }
 
 # ComfyUI-Manager config (weak security for auto-install)

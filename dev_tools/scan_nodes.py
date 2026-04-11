@@ -2,7 +2,8 @@ import json
 from pathlib import Path
 from collections import defaultdict
 
-wf_dir = Path(r'H:\FeddaUI-claude\comfyuifeddafrontclean\frontend\public\workflows')
+ROOT_DIR = Path(__file__).resolve().parents[1]
+wf_dir = ROOT_DIR / "frontend" / "public" / "workflows"
 
 KNOWN_CORE = {
     'UNETLoader','CLIPLoader','VAELoader','CLIPTextEncode','KSamplerAdvanced',

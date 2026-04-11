@@ -6,9 +6,9 @@ Updated: 2026-04-03
 Match FEDDA LTX runtime behavior with known-good reference install at `E:\v337\App\ComfyUI`.
 
 ## Source-of-truth
-- Dev source: `H:\Final\060326\comfyuifeddafrontclean`
-- Install/runtime copy: `H:\Final\060326\comfyuifeddafront`
-- Reference runtime: `E:\v337\App\ComfyUI`
+- Repo source: this repository
+- Active local install: your current FEDDA runtime copy
+- Reference runtime: separate known-good ComfyUI install used for parity checks
 
 ## Baseline checklist
 - ComfyUI core commit: pending capture

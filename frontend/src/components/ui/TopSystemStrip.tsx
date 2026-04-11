@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, BrainCircuit, Loader2, Trash2, Zap, DownloadCloud, Play } from 'lucide-react';
+import { Activity, BrainCircuit, Loader2, Trash2, Zap, DownloadCloud, Play, KeyRound } from 'lucide-react';
 import { useComfyStatus } from '../../hooks/useComfyStatus';
 import { useOllamaStatus } from '../../hooks/useOllamaStatus';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
-import { COMFY_API } from '../../config/api';
+import { BACKEND_API, COMFY_API } from '../../config/api';
 
 export const TopSystemStrip = () => {
   const comfy = useComfyStatus(3000);
@@ -13,6 +13,9 @@ export const TopSystemStrip = () => {
   const [comfyStats, setComfyStats] = useState<any>(null);
   const [gpuStats, setGpuStats] = useState<any>(null);
   const [purging, setPurging] = useState(false);
+  const [hfConfigured, setHfConfigured] = useState(false);
+  const [hfLoading, setHfLoading] = useState(true);
+  const [hfSaving, setHfSaving] = useState(false);
 
   // Poll hardware + comfy system stats
   useEffect(() => {
@@ -40,6 +43,25 @@ export const TopSystemStrip = () => {
     const id = setInterval(update, 3000);
     return () => { mounted = false; clearInterval(id); };
   }, [comfy.isConnected]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadHfStatus = async () => {
+      try {
+        const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.SETTINGS_HF_TOKEN_STATUS}`, { cache: 'no-store' });
+        const data = await r.json();
+        if (mounted) setHfConfigured(!!data.configured);
+      } catch {
+        if (mounted) setHfConfigured(false);
+      } finally {
+        if (mounted) setHfLoading(false);
+      }
+    };
+
+    loadHfStatus();
+    return () => { mounted = false; };
+  }, []);
 
   const gpu = useMemo(() => {
     if (!comfyStats?.devices?.length) return null;
@@ -78,6 +100,39 @@ export const TopSystemStrip = () => {
   const ollamaLabel = ollama.isLoading
     ? 'Checking...'
     : ollama.isConnected ? 'Ollama Online' : 'Ollama Offline';
+
+  const handleHfToken = async () => {
+    if (hfSaving) return;
+    const nextToken = window.prompt(
+      hfConfigured
+        ? 'Paste a new Hugging Face token to replace the current one. Leave blank to remove it.'
+        : 'Paste your Hugging Face token (starts with hf_). It will be auto-applied to downloader nodes.',
+      ''
+    );
+
+    if (nextToken === null) return;
+
+    const trimmed = nextToken.trim();
+    if (!trimmed && hfConfigured && !window.confirm('Remove the saved Hugging Face token?')) {
+      return;
+    }
+
+    setHfSaving(true);
+    try {
+      const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.SETTINGS_HF_TOKEN}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: trimmed }),
+      });
+      if (!r.ok) throw new Error('Failed to save token');
+      const data = await r.json();
+      setHfConfigured(!!data.configured);
+    } catch {
+      window.alert('Could not save Hugging Face token.');
+    } finally {
+      setHfSaving(false);
+    }
+  };
 
   return (
     <div className="hidden xl:flex items-center gap-2">
@@ -161,6 +216,20 @@ export const TopSystemStrip = () => {
       >
         {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
         {purging ? 'Purging' : 'Purge VRAM'}
+      </button>
+
+      <button
+        onClick={handleHfToken}
+        disabled={hfSaving}
+        title="Save Hugging Face token for gated model downloads"
+        className={`h-8 px-3 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 disabled:opacity-40 ${
+          hfConfigured
+            ? 'border-sky-500/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/18'
+            : 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/18'
+        }`}
+      >
+        {(hfSaving || hfLoading) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+        {hfSaving ? 'Saving Token' : hfConfigured ? 'HF Token Set' : 'HF Token Missing'}
       </button>
 
       {/* ComfyUI status */}

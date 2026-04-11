@@ -6,8 +6,9 @@ tracked purely by index offset. Links are dicts at top level: links[link_id] = [
 import json
 from pathlib import Path
 
-INPUT_DIR = Path(r"E:\v337\App\ComfyUI\user\default\workflows\XXX")
-OUTPUT_DIR = Path(r"H:\FeddaUI-claude\comfyuifeddafrontclean\frontend\public\workflows")
+ROOT_DIR = Path(__file__).resolve().parents[1]
+INPUT_DIR = ROOT_DIR / "dev_tools" / "workflow_import"
+OUTPUT_DIR = ROOT_DIR / "frontend" / "public" / "workflows"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 

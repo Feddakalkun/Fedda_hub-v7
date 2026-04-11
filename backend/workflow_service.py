@@ -14,6 +14,16 @@ class WorkflowService:
         with open(self.mapping_file, "r") as f:
             return json.load(f)
 
+    def load_runtime_settings(self) -> Dict[str, Any]:
+        settings_path = os.path.join(os.path.dirname(__file__), "..", "config", "runtime_settings.json")
+        if not os.path.exists(settings_path):
+            return {}
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
     def get_workflow_path(self, filename: str) -> str:
         # 1. Try direct path from workflows_dir
         direct_path = os.path.join(self.workflows_dir, filename)
@@ -239,6 +249,17 @@ class WorkflowService:
         # 2. Convert to final API format for ComfyUI if needed
         if not is_api:
             workflow = self.convert_ui_to_api(workflow)
+
+        # 3. Auto-inject Hugging Face token into downloader nodes when configured
+        hf_token = str(self.load_runtime_settings().get("hf_token") or "").strip()
+        if hf_token:
+            for wf_node in workflow.values():
+                if not isinstance(wf_node, dict):
+                    continue
+                if wf_node.get("class_type") != "HuggingFaceDownloader":
+                    continue
+                inputs = wf_node.setdefault("inputs", {})
+                inputs["hf_token"] = hf_token
             
         return workflow
 

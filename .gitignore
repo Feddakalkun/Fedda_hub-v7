@@ -53,6 +53,7 @@ logs/
 frontend/dist/
 frontend/.vite/
 frontend/node_modules/
+frontend/public/lora-previews/_backup/
 
 # Models and large files (installed separately)
 models/

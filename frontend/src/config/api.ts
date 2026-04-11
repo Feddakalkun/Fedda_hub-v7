@@ -44,6 +44,8 @@ export const BACKEND_API = {
         LORA_IMPORT_STATUS: '/api/lora/import-status',
         SETTINGS_CIVITAI_KEY: '/api/settings/civitai-key',
         SETTINGS_CIVITAI_KEY_STATUS: '/api/settings/civitai-key/status',
+        SETTINGS_HF_TOKEN: '/api/settings/hf-token',
+        SETTINGS_HF_TOKEN_STATUS: '/api/settings/hf-token/status',
         CHAT: '/api/chat',
         CHAT_HISTORY: '/api/chat/history',
         CHAT_RESET: '/api/chat/reset',
