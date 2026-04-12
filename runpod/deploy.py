@@ -20,7 +20,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 # ─── Configuration ───────────────────────────────────────────────────
-DOCKER_IMAGE = "ghcr.io/feddakalkun/comfyuifeddafront:latest"
+DOCKER_IMAGE = "ghcr.io/feddakalkun/fedda-runpod:latest"
 POD_NAME = "FEDDA AI Studio"
 VOLUME_GB = 75          # Network volume for models + outputs
 CONTAINER_DISK_GB = 30  # Container disk for OS + packages
