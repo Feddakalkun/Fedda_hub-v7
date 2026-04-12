@@ -56,7 +56,17 @@ COMFY_DIR = ROOT_DIR / "ComfyUI"
 SETTINGS_PATH = CONFIG_DIR / "runtime_settings.json"
 OUTPUT_DIR = COMFY_DIR / "output"
 
-COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8199")
+COMFY_URL_DEFAULT = "http://127.0.0.1:8199"
+
+def get_comfy_url() -> str:
+    """Read ComfyUI URL from settings or environment, with local fallback."""
+    settings = load_settings()
+    cloud_config = settings.get("cloud_config", {})
+    if cloud_config.get("mode") == "remote" and cloud_config.get("url"):
+        return cloud_config["url"].rstrip("/")
+    return os.environ.get("COMFY_URL", COMFY_URL_DEFAULT).rstrip("/")
+
+COMFY_URL = COMFY_URL_DEFAULT
 MOCKINGBIRD_URL = os.environ.get("MOCKINGBIRD_URL", "http://127.0.0.1:8020")
 AGENT_DB_PATH = CONFIG_DIR / "agent_memory.db"
 MEMORY_REFRESH_EVERY_TURNS = 2
@@ -86,6 +96,9 @@ def load_settings() -> dict:
 def save_settings(data: dict) -> None:
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+COMFY_URL = get_comfy_url()
 
 
 # ─────────────────────────────────────────────
@@ -1093,6 +1106,12 @@ OLLAMA_SYSTEM_PROMPTS: Dict[str, str] = {
         "Rules: under 60 words, be specific and visual, no meta-commentary. "
         "Output ONLY the prompt text, nothing else."
     ),
+    "wan-story": (
+        "You are a master cinematic director and AI prompter. You excel at taking a series of visual scene snapshots "
+        "and weaving them into a cohesive, contiguous cinematic narrative for video generation. You describe "
+        "the subject, the fluid motion, the camera dynamics, and the atmospheric lighting that unifies the sequence. "
+        "You output one paragraph per scene, ensuring the story flows gracefully from one to the next."
+    ),
 }
 
 def _build_prompt_user_message(context: str, mode: str, current_prompt: str) -> str:
@@ -1114,6 +1133,9 @@ def _build_prompt_user_message(context: str, mode: str, current_prompt: str) -> 
         "wan-scene": (
             "Prioritize scene action, cinematic pacing, and visual continuity across frames."
         ),
+        "wan-story": (
+            "Prioritize narrative flow, consistent character/subject identity, and smooth motion transitions between consecutive shots."
+        ),
     }.get(ctx, "Prioritize clarity, cinematic detail, and usable generation language.")
 
     if safe_mode == "enhance" and has_prompt:
@@ -1123,6 +1145,15 @@ def _build_prompt_user_message(context: str, mode: str, current_prompt: str) -> 
             f"{context_focus}\n"
             "Rules: no markdown, no bullet list, no explanation, no preface. Output one final prompt only.\n\n"
             f"INPUT PROMPT:\n{current_prompt.strip()}"
+        )
+
+    if has_prompt:
+        # If prompt provided in inspire mode, use it as a detailed instruction/storyboard hint
+        return (
+            "Create a brand-new set of cinematic prompts based on the following instructions and storyboard hints.\n"
+            f"{context_focus}\n"
+            "Rules: no markdown, no bullet list, no explanation, no preface. Output the results clearly as requested.\n\n"
+            f"INSTRUCTIONS:\n{current_prompt.strip()}"
         )
 
     return (
@@ -1656,6 +1687,16 @@ async def lora_import_url(req: ImportUrlRequest):
 async def lora_import_status(job_id: str):
     return lora_service.get_import_status(job_id)
 
+
+@app.post("/api/system/cloud-config")
+async def save_cloud_config(config: Dict[str, Any]):
+    """Update cloud integration settings (Hybrid Mode)."""
+    settings = load_settings()
+    settings["cloud_config"] = config
+    save_settings(settings)
+    global COMFY_URL
+    COMFY_URL = get_comfy_url()
+    return {"success": True, "new_url": COMFY_URL}
 
 if __name__ == "__main__":
     print("[Fedda Hub v2] Starting backend on port 8000...")

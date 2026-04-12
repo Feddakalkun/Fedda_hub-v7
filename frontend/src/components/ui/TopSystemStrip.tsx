@@ -20,13 +20,27 @@ export const TopSystemStrip = () => {
   // Poll hardware + comfy system stats
   useEffect(() => {
     let mounted = true;
+    let timer: number | undefined;
+    let pollDelay = 3000;
+
+    const scheduleNext = () => {
+      if (!mounted) return;
+      timer = window.setTimeout(update, pollDelay);
+    };
 
     const update = async () => {
       // GPU stats from our backend
       try {
-        const r = await fetch('/api/hardware/stats', { cache: 'no-store' });
-        if (r.ok && mounted) setGpuStats(await r.json());
-      } catch {}
+        const r = await fetch(`${BACKEND_API.BASE_URL}/api/hardware/stats`, { cache: 'no-store' });
+        if (r.ok && mounted) {
+          setGpuStats(await r.json());
+          pollDelay = 3000;
+        } else {
+          pollDelay = Math.min(30000, pollDelay * 2);
+        }
+      } catch {
+        pollDelay = Math.min(30000, pollDelay * 2);
+      }
 
       // ComfyUI VRAM stats — only when online
       if (comfy.isConnected) {
@@ -37,11 +51,15 @@ export const TopSystemStrip = () => {
       } else {
         if (mounted) setComfyStats(null);
       }
+
+      scheduleNext();
     };
 
     update();
-    const id = setInterval(update, 3000);
-    return () => { mounted = false; clearInterval(id); };
+    return () => {
+      mounted = false;
+      if (timer) window.clearTimeout(timer);
+    };
   }, [comfy.isConnected]);
 
   useEffect(() => {
@@ -134,8 +152,53 @@ export const TopSystemStrip = () => {
     }
   };
 
+  const [cloudSettings, setCloudSettings] = useState<{ mode: 'local' | 'remote', url: string }>({ mode: 'local', url: '' });
+  const [cloudSaving, setCloudSaving] = useState(false);
+
+  useEffect(() => {
+    const loadCloud = async () => {
+      try {
+        const r = await fetch(`${BACKEND_API.BASE_URL}/api/system/comfy-status`);
+        const data = await r.json();
+        if (data.mode) setCloudSettings({ mode: data.mode, url: data.url || '' });
+      } catch {}
+    };
+    loadCloud();
+  }, []);
+
+  const handleCloudToggle = async () => {
+    if (cloudSaving) return;
+    let nextMode: 'local' | 'remote' = cloudSettings.mode === 'local' ? 'remote' : 'local';
+    let nextUrl = cloudSettings.url;
+    if (nextMode === 'remote') {
+      const input = window.prompt("Enter RunPod Proxy URL:", cloudSettings.url || "");
+      if (input === null) return;
+      nextUrl = input.trim();
+    }
+    setCloudSaving(true);
+    try {
+      await fetch(`${BACKEND_API.BASE_URL}/api/system/cloud-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: nextMode, url: nextUrl }),
+      });
+      window.location.reload();
+    } catch { alert("Error"); }
+    finally { setCloudSaving(false); }
+  };
+
   return (
     <div className="hidden xl:flex items-center gap-2">
+      <button
+        onClick={handleCloudToggle}
+        disabled={cloudSaving}
+        className={`h-8 px-3 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
+          cloudSettings.mode === 'remote' ? 'border-cyan-500/50 bg-cyan-500/15 text-cyan-300' : 'border-white/10 bg-white/5 text-slate-400'
+        }`}
+      >
+        <DownloadCloud className="w-3.5 h-3.5" />
+        {cloudSettings.mode === 'remote' ? 'Cloud' : 'Local'}
+      </button>
 
       {/* Execution Progress Bar */}
       {state === 'executing' && (

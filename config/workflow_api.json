@@ -191,40 +191,100 @@
         "label": "Reference Image"
       },
       "horizontal_angle": {
-        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "node_ids": [
+          "93",
+          "218",
+          "226",
+          "234",
+          "242",
+          "250"
+        ],
         "input_key": "horizontal_angle",
         "type": "number",
         "label": "Horizontal Angle"
       },
       "vertical_angle": {
-        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "node_ids": [
+          "93",
+          "218",
+          "226",
+          "234",
+          "242",
+          "250"
+        ],
         "input_key": "vertical_angle",
         "type": "number",
         "label": "Vertical Angle"
       },
       "zoom": {
-        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "node_ids": [
+          "93",
+          "218",
+          "226",
+          "234",
+          "242",
+          "250"
+        ],
         "input_key": "zoom",
         "type": "number",
         "label": "Zoom"
       },
       "default_prompts": {
-        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "node_ids": [
+          "93",
+          "218",
+          "226",
+          "234",
+          "242",
+          "250"
+        ],
         "input_key": "default_prompts",
         "type": "boolean",
         "label": "Default Prompts"
       },
       "camera_view": {
-        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "node_ids": [
+          "93",
+          "218",
+          "226",
+          "234",
+          "242",
+          "250"
+        ],
         "input_key": "camera_view",
         "type": "boolean",
         "label": "Camera View"
       },
       "seed": {
-        "node_ids": ["197:108", "213:271", "221:280", "229:289", "237:298", "245:307"],
+        "node_ids": [
+          "197:108",
+          "213:271",
+          "221:280",
+          "229:289",
+          "237:298",
+          "245:307"
+        ],
         "input_key": "seed",
         "type": "seed_sequence",
         "label": "Seed"
+      },
+      "character_lock_text": {
+        "input_key": "prompt",
+        "type": "string",
+        "node_ids": [
+          "197:109",
+          "213:272",
+          "221:281",
+          "229:290",
+          "237:299",
+          "245:308"
+        ],
+        "label": "Character Lock Text"
+      },
+      "loras": {
+        "type": "loras",
+        "node_id": "111",
+        "label": "LoRAs"
       }
     }
   },
@@ -626,5 +686,399 @@
         "label": "Seed"
       }
     }
+  },
+  "wan22-img2vid-6frames": {
+    "name": "WAN 2.2 Img2Vid (6 Frames)",
+    "filename": "wan22/img2vid-6frames-wan22.json",
+    "description": "6 consecutive frames with 6 prompts",
+    "inputs": {
+      "image1": {
+        "node_id": "62",
+        "input_key": "image",
+        "type": "string",
+        "label": "Image 1"
+      },
+      "image2": {
+        "node_id": "190",
+        "input_key": "image",
+        "type": "string",
+        "label": "Image 2"
+      },
+      "image3": {
+        "node_id": "194",
+        "input_key": "image",
+        "type": "string",
+        "label": "Image 3"
+      },
+      "image4": {
+        "node_id": "198",
+        "input_key": "image",
+        "type": "string",
+        "label": "Image 4"
+      },
+      "image5": {
+        "node_id": "202",
+        "input_key": "image",
+        "type": "string",
+        "label": "Image 5"
+      },
+      "image6": {
+        "node_id": "206",
+        "input_key": "image",
+        "type": "string",
+        "label": "Image 6"
+      },
+      "prompt1": {
+        "node_id": "303:289",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt 1"
+      },
+      "prompt2": {
+        "node_id": "288:274",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt 2"
+      },
+      "prompt3": {
+        "node_id": "273:259",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt 3"
+      },
+      "prompt4": {
+        "node_id": "258:244",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt 4"
+      },
+      "prompt5": {
+        "node_id": "243:229",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt 5"
+      },
+      "prompt6": {
+        "node_id": "333:325",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt 6"
+      },
+      "seed": {
+        "node_ids": [
+          "303:294",
+          "303:301",
+          "288:279",
+          "288:286",
+          "273:264",
+          "273:271",
+          "258:249",
+          "258:256",
+          "243:234",
+          "243:241",
+          "333:327",
+          "333:330"
+        ],
+        "input_key": "noise_seed",
+        "type": "seed_sequence",
+        "label": "Seed"
+      },
+      "lora_high": {
+        "node_ids": [
+          "170",
+          "187",
+          "191",
+          "195",
+          "199",
+          "203"
+        ],
+        "input_key": "lora_1",
+        "type": "object",
+        "label": "High Noise LoRA"
+      },
+      "lora_low": {
+        "node_ids": [
+          "171",
+          "188",
+          "192",
+          "196",
+          "200",
+          "204"
+        ],
+        "input_key": "lora_1",
+        "type": "object",
+        "label": "Low Noise LoRA"
+      },
+      "nsfw": {
+        "type": "nsfw_toggle",
+        "label": "NSFW"
+      }
+    }
+  },
+  "influencer-expression": {
+    "inputs": {
+      "eyebrow": {
+        "type": "number",
+        "node_id": "12",
+        "input_key": "value",
+        "label": "Eyebrow"
+      },
+      "aaa": {
+        "type": "number",
+        "node_id": "16",
+        "input_key": "value",
+        "label": "Mouth AAA"
+      },
+      "woo": {
+        "type": "number",
+        "node_id": "18",
+        "input_key": "value",
+        "label": "Mouth WOO"
+      },
+      "image": {
+        "type": "string",
+        "node_id": "1",
+        "input_key": "image",
+        "label": "Source Image"
+      },
+      "pupil_x": {
+        "type": "number",
+        "node_id": "14",
+        "input_key": "value",
+        "label": "Pupil X"
+      },
+      "rotate_pitch": {
+        "type": "number",
+        "node_id": "9",
+        "input_key": "value",
+        "label": "Rotate Pitch"
+      },
+      "wink": {
+        "type": "number",
+        "node_id": "13",
+        "input_key": "value",
+        "label": "Wink"
+      },
+      "blink": {
+        "type": "number",
+        "node_id": "6",
+        "input_key": "value",
+        "label": "Blink"
+      },
+      "rotate_yaw": {
+        "type": "number",
+        "node_id": "20",
+        "input_key": "value",
+        "label": "Rotate Yaw"
+      },
+      "eee": {
+        "type": "number",
+        "node_id": "17",
+        "input_key": "value",
+        "label": "Mouth EEE"
+      },
+      "smile": {
+        "type": "number",
+        "node_id": "19",
+        "input_key": "value",
+        "label": "Smile"
+      },
+      "pupil_y": {
+        "type": "number",
+        "node_id": "15",
+        "input_key": "value",
+        "label": "Pupil Y"
+      },
+      "rotate_roll": {
+        "type": "number",
+        "node_id": "11",
+        "input_key": "value",
+        "label": "Rotate Roll"
+      }
+    },
+    "description": "Expression editing with identity-locked source image.",
+    "name": "Influencer Expression",
+    "filename": "Influencer/EXPRESSION.json"
+  },
+  "influencer-automask": {
+    "inputs": {
+      "mask_accessories": {
+        "type": "boolean",
+        "node_id": "82",
+        "input_key": "accessories",
+        "label": "Mask Accessories"
+      },
+      "mask_background": {
+        "type": "boolean",
+        "node_id": "82",
+        "input_key": "background",
+        "label": "Mask Background"
+      },
+      "prompt": {
+        "type": "string",
+        "node_id": "109",
+        "input_key": "string",
+        "label": "Replacement Prompt"
+      },
+      "image": {
+        "type": "string",
+        "node_id": "108",
+        "input_key": "image",
+        "label": "Source Image"
+      },
+      "mask_body": {
+        "type": "boolean",
+        "node_id": "82",
+        "input_key": "body",
+        "label": "Mask Body"
+      },
+      "mask_hair": {
+        "type": "boolean",
+        "node_id": "82",
+        "input_key": "hair",
+        "label": "Mask Hair"
+      },
+      "seed": {
+        "type": "number",
+        "node_id": "110",
+        "input_key": "seed",
+        "label": "Seed"
+      },
+      "loras": {
+        "type": "loras",
+        "node_id": "111",
+        "label": "LoRAs"
+      },
+      "mask_face": {
+        "type": "boolean",
+        "node_id": "82",
+        "input_key": "face",
+        "label": "Mask Face"
+      },
+      "mask_clothes": {
+        "type": "boolean",
+        "node_id": "82",
+        "input_key": "clothes",
+        "label": "Mask Clothes"
+      }
+    },
+    "description": "Auto-mask + inpaint with text-controlled replacement.",
+    "name": "Influencer WAN2.2 AutoMask",
+    "filename": "Influencer/wan22-automask.json"
+  },
+  "influencer-characterv3": {
+    "inputs": {
+      "pose_13": {
+        "type": "string",
+        "node_id": "53",
+        "input_key": "image",
+        "label": "Pose Ref 13"
+      },
+      "seed": {
+        "type": "number",
+        "node_id": "28",
+        "input_key": "seed",
+        "label": "Seed"
+      },
+      "pose_12": {
+        "type": "string",
+        "node_id": "52",
+        "input_key": "image",
+        "label": "Pose Ref 12"
+      },
+      "pose_6": {
+        "type": "string",
+        "node_id": "46",
+        "input_key": "image",
+        "label": "Pose Ref 6"
+      },
+      "pose_11": {
+        "type": "string",
+        "node_id": "51",
+        "input_key": "image",
+        "label": "Pose Ref 11"
+      },
+      "pose_15": {
+        "type": "string",
+        "node_id": "55",
+        "input_key": "image",
+        "label": "Pose Ref 15"
+      },
+      "pose_5": {
+        "type": "string",
+        "node_id": "45",
+        "input_key": "image",
+        "label": "Pose Ref 5"
+      },
+      "image": {
+        "type": "string",
+        "node_id": "3",
+        "input_key": "image",
+        "label": "Subject Image"
+      },
+      "pose_3": {
+        "type": "string",
+        "node_id": "43",
+        "input_key": "image",
+        "label": "Pose Ref 3"
+      },
+      "pose_10": {
+        "type": "string",
+        "node_id": "50",
+        "input_key": "image",
+        "label": "Pose Ref 10"
+      },
+      "pose_7": {
+        "type": "string",
+        "node_id": "47",
+        "input_key": "image",
+        "label": "Pose Ref 7"
+      },
+      "pose_9": {
+        "type": "string",
+        "node_id": "49",
+        "input_key": "image",
+        "label": "Pose Ref 9"
+      },
+      "pose_8": {
+        "type": "string",
+        "node_id": "48",
+        "input_key": "image",
+        "label": "Pose Ref 8"
+      },
+      "pose_1": {
+        "type": "string",
+        "node_id": "29",
+        "input_key": "image",
+        "label": "Pose Ref 1"
+      },
+      "pose_14": {
+        "type": "string",
+        "node_id": "54",
+        "input_key": "image",
+        "label": "Pose Ref 14"
+      },
+      "pose_4": {
+        "type": "string",
+        "node_id": "44",
+        "input_key": "image",
+        "label": "Pose Ref 4"
+      },
+      "pose_2": {
+        "type": "string",
+        "node_id": "36",
+        "input_key": "image",
+        "label": "Pose Ref 2"
+      },
+      "prompt": {
+        "type": "string",
+        "node_id": "66",
+        "input_key": "text",
+        "label": "Positive Prompt"
+      }
+    },
+    "description": "One subject + up to 15 reference poses for identity-consistent variants.",
+    "name": "Influencer Character v3",
+    "filename": "Influencer/CHARACTERV3.json"
   }
 }

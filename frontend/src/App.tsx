@@ -5,52 +5,9 @@ import { LandingPage } from './pages/LandingPage';
 import { TopSystemStrip } from './components/ui/TopSystemStrip';
 import { ToastProvider } from './components/ui/Toast';
 import { ComfyExecutionProvider } from './contexts/ComfyExecutionContext';
-import {
-  MessageSquare,
-  Sparkles,
-  Video,
-  Music,
-  Images,
-  Film,
-  LayoutDashboard,
-  Wand2,
-  Terminal,
-} from 'lucide-react';
-
-// ─── Tab registry ──────────────────────────────────────────────────────────
-const VALID_TABS = new Set([
-  'chat', 'image', 'z-image', 'z-image-txt2img', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'qwen-multi-angle', 'image-other',
-  'video', 'wan22-vid2vid', 'wan22-img2vid',
-  'ltx', 'ltx-flf', 'ltx-img-audio',
-  'audio', 'gallery', 'videos', 'library', 'workflows',
-  'logs',
-]);
-
-const PAGE_META: Record<string, { label: string; description: string; Icon: any }> = {
-  chat:        { label: 'Agent Chat',    description: 'Your AI assistant and creative collaborator.',         Icon: MessageSquare   },
-  image:       { label: 'Image Studio',  description: 'Generate and edit images with advanced AI models.',    Icon: Sparkles        },
-  'z-image':   { label: 'Z-Image', description: 'Z-Image workflow family.', Icon: Sparkles },
-  'z-image-txt2img': { label: 'Z-Image (Txt2Img)', description: 'Premium text to image generation using z-image workflow.', Icon: Sparkles },
-  flux:        { label: 'FLUX2-KLEIN Studio',   description: 'FLUX2-KLEIN workflow family.', Icon: Sparkles },
-  'flux-txt2img': { label: 'FLUX2-KLEIN (Txt2Img)', description: 'Txt2Img workspace for FLUX2-KLEIN.', Icon: Sparkles },
-  qwen:        { label: 'Qwen Studio',   description: 'Qwen workflow family.', Icon: Sparkles },
-  'qwen-txt2img': { label: 'Qwen (Txt2Img)', description: 'Txt2Img workspace for Qwen.', Icon: Sparkles },
-  'qwen-image-ref': { label: 'Qwen (Image Reference)', description: 'Generate from a reference image to keep character identity.', Icon: Sparkles },
-  'qwen-multi-angle': { label: 'Qwen (Multi Angles)', description: 'Upload one image and generate camera-angle variants.', Icon: Sparkles },
-  'image-other': { label: 'Other Workflows', description: 'Uncategorized image processing capabilities.', Icon: Sparkles },
-  video:          { label: 'Video Studio',   description: 'Create and animate video sequences with WAN.',        Icon: Video           },
-  'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.',            Icon: Video           },
-  'wan22-img2vid': { label: 'WAN 2.2 Img2Vid', description: 'Animate a still image into video with WAN 2.2.',      Icon: Video           },
-  'ltx':           { label: 'LTX Video',        description: 'LTX Video 2.3 — cinematic AI video generation.',      Icon: Film            },
-  'ltx-flf':       { label: 'LTX — First / Last Frame',    description: 'Generate video between two keyframes with LTX 2.3.',      Icon: Film },
-  'ltx-img-audio': { label: 'LTX — Img + Audio Lipsync', description: 'Generate lipsync video from image and audio with LTX 2.3.', Icon: Film },
-  audio:       { label: 'Audio / SFX',   description: 'Generate music, voice, and sound effects.',           Icon: Music           },
-  gallery:     { label: 'Gallery',       description: 'Browse and manage your generated images.',             Icon: Images          },
-  videos:      { label: 'Videos',        description: 'View and manage your generated video files.',          Icon: Film            },
-  library:     { label: 'LoRA Library',  description: 'Manage your installed LoRA models.',                  Icon: LayoutDashboard },
-  workflows:   { label: 'Workflows',     description: 'Build and run custom ComfyUI generation pipelines.',  Icon: Wand2           },
-  logs:        { label: 'Console Logs',  description: 'Monitor backend logs and debug information.',          Icon: Terminal        },
-};
+import { TopQuickLinks } from './components/layout/TopQuickLinks';
+import { GlobalMediaHub } from './components/layout/GlobalMediaHub';
+import { PAGE_META, VALID_TABS } from './config/navigation';
 
 // ─── Persistence ───────────────────────────────────────────────────────────
 const TAB_KEY = 'fedda_active_tab_v2';
@@ -101,10 +58,12 @@ function FeddaApp() {
       case 'qwen-image-ref':
       case 'qwen-multi-angle':
       case 'image-other':
+      case 'image-influencer':
         return <ImageStudioPage activeTab={activeTab} />;
       case 'video':
       case 'wan22-vid2vid':
       case 'wan22-img2vid':
+      case 'wan22-img2vid-6frames':
       case 'ltx':
       case 'ltx-flf':
       case 'ltx-img-audio':
@@ -132,9 +91,13 @@ function FeddaApp() {
       <main className="flex-1 flex flex-col overflow-hidden theme-bg-main">
         {/* Top header */}
         <header className="h-14 border-b border-white/5 flex items-center px-6 shrink-0 z-10 justify-between backdrop-blur-sm bg-black/20">
-          <div className="flex items-center gap-3">
-            <meta.Icon className="w-4 h-4 text-slate-500" />
-            <h2 className="text-sm font-semibold text-white tracking-tight">{meta.label}</h2>
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="flex items-center gap-3">
+              <meta.Icon className="w-4 h-4 text-slate-500" />
+              <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">{meta.label}</h2>
+            </div>
+            <TopQuickLinks activeTab={activeTab} onTabChange={handleTabChange} />
+            <GlobalMediaHub onNavigate={handleTabChange} />
           </div>
 
           {/* Right side: system monitor */}
