@@ -52,10 +52,33 @@ RUN git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Manager.git \
     && git clone --depth 1 https://github.com/rgthree/rgthree-comfy.git \
     && git clone --depth 1 https://github.com/comfyanonymous/ComfyUI_bitsandbytes_NF4.git \
     && git clone --depth 1 https://github.com/city96/ComfyUI-GGUF.git \
-    && git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Impact-Pack.git
+    && git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Impact-Pack.git \
+    && git clone --depth 1 https://github.com/kijai/ComfyUI-KJNodes.git \
+    && git clone --depth 1 https://github.com/yolain/ComfyUI-Easy-Use.git \
+    && git clone --depth 1 https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git \
+    && git clone --depth 1 https://github.com/comfyuistudio/ComfyUI-Studio-nodes.git \
+    && git clone --depth 1 https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
+    && git clone --depth 1 https://github.com/jtydhr88/ComfyUI-qwenmultiangle.git \
+    && git clone --depth 1 https://github.com/kijai/ComfyUI-Florence2.git \
+    && git clone --depth 1 https://github.com/kijai/ComfyUI-SeedVR2_VideoUpscaler.git \
+    && git clone --depth 1 https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git
+RUN git clone --depth 1 https://github.com/Saganaki22/ComfyUI-FishAudioS2.git || true
 
 RUN cd /app/ComfyUI/custom_nodes/ComfyUI-Manager && python3 -m pip install --no-cache-dir -r requirements.txt || true
 RUN cd /app/ComfyUI/custom_nodes/ComfyUI-Impact-Pack && python3 -m pip install --no-cache-dir -r requirements.txt || true
+RUN set -eux; \
+    for req in \
+      /app/ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-Easy-Use/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-Studio-nodes/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-qwenmultiangle/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-Florence2/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-SeedVR2_VideoUpscaler/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/requirements.txt \
+      /app/ComfyUI/custom_nodes/ComfyUI-FishAudioS2/requirements.txt; do \
+      if [ -f "$req" ]; then python3 -m pip install --no-cache-dir -r "$req" || true; fi; \
+    done
 
 RUN python3 -m pip install --no-cache-dir \
     insightface \
