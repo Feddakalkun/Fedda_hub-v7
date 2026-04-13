@@ -1,6 +1,4 @@
 import { ZImageTxt2Img } from './zimage/ZImageTxt2Img';
-import { Sparkles } from 'lucide-react';
-import { PlaceholderPage } from './PlaceholderPage';
 import { FluxTxt2Img } from './flux/FluxTxt2Img';
 import { QwenTxt2Img } from './qwen/QwenTxt2Img';
 import { QwenImageReferencePage } from './qwen/QwenImageReferencePage';
@@ -39,7 +37,9 @@ export const ImageStudioPage = ({ activeTab = 'z-image' }: ImageStudioPageProps)
   }
 
   if (activeTab === 'image-other') {
-    return <PlaceholderPage label="Other Workflows" description="Uncategorized image processing capabilities coming soon." icon={<Sparkles className="w-8 h-8" />} />;
+    // Backward-compat fallback: older persisted tab state may point to image-other.
+    // Route it to Influencer so users don't land on deprecated placeholder.
+    return <InfluencerPage />;
   }
 
   return <ZImageTxt2Img />; // Fallback
