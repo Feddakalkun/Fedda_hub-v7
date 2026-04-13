@@ -67,6 +67,8 @@ RUN set -eux; \
     clone_required https://github.com/comfyanonymous/ComfyUI_bitsandbytes_NF4.git ComfyUI_bitsandbytes_NF4; \
     clone_required https://github.com/city96/ComfyUI-GGUF.git ComfyUI-GGUF; \
     clone_required https://github.com/ltdrdata/ComfyUI-Impact-Pack.git ComfyUI-Impact-Pack; \
+    clone_required https://github.com/kijai/ComfyUI-WanVideoWrapper.git ComfyUI-WanVideoWrapper; \
+    clone_required https://github.com/kijai/ComfyUI-WanAnimatePreprocess.git ComfyUI-WanAnimatePreprocess; \
     clone_required https://github.com/kijai/ComfyUI-KJNodes.git ComfyUI-KJNodes; \
     clone_required https://github.com/yolain/ComfyUI-Easy-Use.git ComfyUI-Easy-Use; \
     clone_required https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git ComfyUI-Custom-Scripts; \
@@ -83,6 +85,8 @@ RUN set -eux; \
 
 RUN cd /app/ComfyUI/custom_nodes/ComfyUI-Manager && python3 -m pip install --no-cache-dir -r requirements.txt || true
 RUN cd /app/ComfyUI/custom_nodes/ComfyUI-Impact-Pack && python3 -m pip install --no-cache-dir -r requirements.txt || true
+RUN cd /app/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && python3 -m pip install --no-cache-dir -r requirements.txt || true
+RUN cd /app/ComfyUI/custom_nodes/ComfyUI-WanAnimatePreprocess && python3 -m pip install --no-cache-dir -r requirements.txt || true
 RUN set -eux; \
     for req in \
       /app/ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt \

@@ -74,6 +74,7 @@ function FeddaApp() {
       case 'wan22-vid2vid':
       case 'wan22-img2vid':
       case 'wan22-img2vid-6frames':
+      case 'wan21-steady-dancer':
       case 'ltx':
       case 'ltx-flf':
       case 'ltx-img-audio':

@@ -76,6 +76,7 @@ export const SIDEBAR_SECTIONS: NavSection[] = [
         label: 'Video Studio',
         icon: Video,
         subitems: [
+          { id: 'wan21-steady-dancer', label: 'WAN 2.1 - Steady Dancer' },
           { id: 'wan22-vid2vid', label: 'WAN 2.2 - Vid2Vid' },
           { id: 'wan22-img2vid', label: 'WAN 2.2 - Img2Vid' },
           { id: 'wan22-img2vid-6frames', label: 'WAN 2.2 - Story (6 Frames)' },
@@ -132,6 +133,11 @@ export const PAGE_META: Record<string, PageMeta> = {
     Icon: Sparkles,
   },
   video: { label: 'Video Studio', description: 'Create and animate video sequences with WAN.', Icon: Video },
+  'wan21-steady-dancer': {
+    label: 'WAN 2.1 Steady Dancer',
+    description: 'Transfer motion from a reference video onto a selected subject image.',
+    Icon: Video,
+  },
   'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.', Icon: Video },
   'wan22-img2vid': { label: 'WAN 2.2 Img2Vid', description: 'Animate a still image into video with WAN 2.2.', Icon: Video },
   'wan22-img2vid-6frames': { label: 'WAN 2.2 Story (6 Frames)', description: 'Animate a sequence into a full video with WAN 2.2.', Icon: Video },
