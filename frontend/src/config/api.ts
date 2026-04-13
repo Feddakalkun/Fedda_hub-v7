@@ -42,6 +42,8 @@ export const BACKEND_API = {
         LORA_INSTALLED: '/api/lora/installed',
         LORA_IMPORT_URL: '/api/lora/import-url',
         LORA_IMPORT_STATUS: '/api/lora/import-status',
+        LORA_UPLOAD: '/api/lora/upload',
+        LORA_UPLOAD_TARGETS: '/api/lora/upload-targets',
         SETTINGS_CIVITAI_KEY: '/api/settings/civitai-key',
         SETTINGS_CIVITAI_KEY_STATUS: '/api/settings/civitai-key/status',
         SETTINGS_HF_TOKEN: '/api/settings/hf-token',

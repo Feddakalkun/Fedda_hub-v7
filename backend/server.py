@@ -1688,6 +1688,34 @@ async def lora_import_status(job_id: str):
     return lora_service.get_import_status(job_id)
 
 
+@app.get("/api/lora/upload-targets")
+async def lora_upload_targets():
+    return {"success": True, "targets": lora_service.get_upload_destinations()}
+
+
+@app.post("/api/lora/upload")
+async def lora_upload_file(
+    file: UploadFile = File(...),
+    destination: str = Form("imported"),
+    overwrite: bool = Form(False),
+):
+    try:
+        content = await file.read()
+        result = lora_service.save_uploaded_lora(
+            filename=file.filename or "uploaded.safetensors",
+            content=content,
+            destination_key=destination,
+            overwrite=overwrite,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=str(result.get("error", "Upload failed")))
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.post("/api/system/cloud-config")
 async def save_cloud_config(config: Dict[str, Any]):
     """Update cloud integration settings (Hybrid Mode)."""

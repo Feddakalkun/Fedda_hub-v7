@@ -3,7 +3,7 @@ set -euo pipefail
 
 COMFY_PORT="${COMFY_PORT:-8199}"
 COMFY_LISTEN="${COMFY_LISTEN:-0.0.0.0}"
-COMFY_BASE_ARGS="--port ${COMFY_PORT} --listen ${COMFY_LISTEN} --enable-cors-header * --preview-method auto --disable-auto-launch"
+CORS_ORIGIN="${COMFY_CORS_ORIGIN:-*}"
 
 RESERVE_VRAM_GB="${COMFY_RESERVE_VRAM_GB:-}"
 if [ -z "${RESERVE_VRAM_GB}" ]; then
@@ -29,4 +29,23 @@ fi
 
 EXTRA_ARGS="${COMFY_EXTRA_ARGS:-}"
 echo "[FEDDA] Starting ComfyUI on ${COMFY_LISTEN}:${COMFY_PORT} (reserve-vram=${RESERVE_VRAM_GB}GB)"
-exec python3 -u /app/ComfyUI/main.py ${COMFY_BASE_ARGS} --reserve-vram "${RESERVE_VRAM_GB}" ${EXTRA_ARGS}
+
+# Build argv as an array to avoid shell glob expansion (e.g. '*' becoming file names),
+# which can crash ComfyUI argparse with exit code 2 under supervisord.
+args=(
+  --port "${COMFY_PORT}"
+  --listen "${COMFY_LISTEN}"
+  --enable-cors-header "${CORS_ORIGIN}"
+  --preview-method auto
+  --disable-auto-launch
+  --reserve-vram "${RESERVE_VRAM_GB}"
+)
+
+if [ -n "${EXTRA_ARGS}" ]; then
+  # Allow power-users to pass additional flags via COMFY_EXTRA_ARGS.
+  # shellcheck disable=SC2206
+  extra_args_array=(${EXTRA_ARGS})
+  args+=("${extra_args_array[@]}")
+fi
+
+exec python3 -u /app/ComfyUI/main.py "${args[@]}"

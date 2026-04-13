@@ -66,6 +66,22 @@ PACKS: Dict[str, Dict[str, str]] = {
     },
 }
 
+UPLOAD_DESTINATIONS: Dict[str, Dict[str, str]] = {
+    "imported": {"folder": "imported", "label": "Imported"},
+    "starter": {"folder": "starter", "label": "Starter"},
+    "zimage_turbo": {"folder": "zimage_turbo", "label": "Z-Image"},
+    "flux2klein": {"folder": "flux2klein", "label": "FLUX2KLEIN"},
+    "flux1dev": {"folder": "flux1dev", "label": "FLUX.1-dev"},
+    "sd15": {"folder": "sd15", "label": "SD 1.5"},
+    "sd15-lycoris": {"folder": "sd15-lycoris", "label": "SD 1.5 LyCORIS"},
+    "sdxl": {"folder": "sdxl", "label": "SDXL"},
+    "wan22": {"folder": "wan22", "label": "WAN 2.2"},
+    "ltx": {"folder": "ltx", "label": "LTX"},
+    "qwen": {"folder": "qwen", "label": "QWEN"},
+}
+
+ALLOWED_UPLOAD_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin"}
+
 FREE_LORAS = [
     {
         "id":       "emmy",
@@ -406,6 +422,65 @@ class LoRAService:
         if not job:
             return {"success": False, "error": "Job not found"}
         return {"success": True, **job}
+
+    # ─── Local file upload ───────────────────────────────────────────────────
+
+    def get_upload_destinations(self) -> List[Dict[str, str]]:
+        return [
+            {"key": key, "folder": meta["folder"], "label": meta["label"]}
+            for key, meta in UPLOAD_DESTINATIONS.items()
+        ]
+
+    def save_uploaded_lora(
+        self,
+        filename: str,
+        content: bytes,
+        destination_key: str = "imported",
+        overwrite: bool = False,
+    ) -> Dict[str, Any]:
+        destination = UPLOAD_DESTINATIONS.get(destination_key)
+        if not destination:
+            return {"success": False, "error": f"Unknown destination '{destination_key}'"}
+
+        safe_name = Path(filename or "").name.strip()
+        if not safe_name:
+            return {"success": False, "error": "Missing filename"}
+
+        ext = Path(safe_name).suffix.lower()
+        if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+            allowed = ", ".join(sorted(ALLOWED_UPLOAD_EXTENSIONS))
+            return {"success": False, "error": f"Unsupported file type '{ext}'. Allowed: {allowed}"}
+
+        if not content:
+            return {"success": False, "error": "Empty file"}
+
+        target_dir = self.lora_dir / destination["folder"]
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        target_file = target_dir / safe_name
+        if target_file.exists() and not overwrite:
+            stem = target_file.stem
+            suffix = target_file.suffix
+            idx = 1
+            while True:
+                candidate = target_dir / f"{stem}_{idx}{suffix}"
+                if not candidate.exists():
+                    target_file = candidate
+                    break
+                idx += 1
+
+        with open(target_file, "wb") as fh:
+            fh.write(content)
+
+        rel_path = str(target_file.relative_to(self.lora_dir)).replace("\\", "/")
+        size_mb = round(target_file.stat().st_size / (1024 * 1024), 2)
+        return {
+            "success": True,
+            "filename": target_file.name,
+            "path": rel_path,
+            "size_mb": size_mb,
+            "destination": destination_key,
+        }
 
 
 lora_service = LoRAService(Path(__file__).parent.parent)
