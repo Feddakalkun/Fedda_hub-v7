@@ -7,6 +7,10 @@ Use this repo with:
 - `Dockerfile`: `runpod/Dockerfile`
 - Build context: repo root
 
+Recommended image tags:
+- Stable (`main`): `ghcr.io/feddakalkun/fedda-runpod:latest`
+- Dev (`codex/runpod-template-setup`): `ghcr.io/feddakalkun/fedda-runpod:runpod-dev`
+
 ## 2. RunPod Template Fields
 Set these in the template:
 - `Container Start Command`: leave empty (image uses entrypoint `/app/runpod_start.sh`)

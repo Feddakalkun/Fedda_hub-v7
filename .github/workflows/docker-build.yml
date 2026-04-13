@@ -2,7 +2,9 @@ name: Build & Push Docker Image
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - codex/runpod-template-setup
   workflow_dispatch: # Manual trigger
 
 env:
@@ -39,7 +41,8 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             ${{ env.REGISTRY }}/${{ env.RUNPOD_IMAGE }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=runpod-dev,enable=${{ github.ref == 'refs/heads/codex/runpod-template-setup' }}
             type=sha,prefix=
 
       - name: Build and push Docker image
