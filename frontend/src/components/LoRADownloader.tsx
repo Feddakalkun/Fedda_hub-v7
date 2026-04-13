@@ -151,6 +151,8 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
     const [importUrl, setImportUrl]           = useState('');
     const [importJobId, setImportJobId]       = useState<string | null>(null);
     const [importStatus, setImportStatus]     = useState<string>('');
+    const [bulkImportText, setBulkImportText] = useState('');
+    const [isBulkImporting, setIsBulkImporting] = useState(false);
     const [previewOpen, setPreviewOpen]       = useState(false);
     const [previewTitle, setPreviewTitle]     = useState('');
     const [previewItems, setPreviewItems]     = useState<CatalogItem[]>([]);
@@ -274,12 +276,78 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
             const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_URL}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: importUrl.trim() }),
+                body: JSON.stringify({ url: importUrl.trim(), destination: selectedUploadTarget }),
             });
             const d = await r.json();
             if (d.success) setImportJobId(d.job_id);
             else setImportStatus(d.error || 'Failed');
         } catch (e: any) { setImportStatus(e.message); }
+    };
+
+    const parseUrlsFromText = (raw: string): string[] => {
+        const urls = (raw.match(/https?:\/\/[^\s"'<>]+/gi) || []).map((u) => u.trim());
+        const deduped: string[] = [];
+        const seen = new Set<string>();
+        for (const url of urls) {
+            if (!seen.has(url)) {
+                seen.add(url);
+                deduped.push(url);
+            }
+        }
+        return deduped;
+    };
+
+    const waitForImportJob = async (jobId: string, timeoutMs = 20 * 60 * 1000): Promise<boolean> => {
+        const started = Date.now();
+        while (Date.now() - started < timeoutMs) {
+            const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_STATUS}/${jobId}`);
+            const d = await r.json();
+            if (!d?.success) return false;
+            if (d.status === 'completed') return true;
+            if (d.status === 'error') return false;
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+        return false;
+    };
+
+    const handleBulkImport = async () => {
+        if (isBulkImporting) return;
+        const urls = parseUrlsFromText(bulkImportText);
+        if (urls.length === 0) {
+            setImportStatus('No valid URLs found in pasted text.');
+            return;
+        }
+
+        setIsBulkImporting(true);
+        let ok = 0;
+        let failed = 0;
+
+        for (let i = 0; i < urls.length; i += 1) {
+            const url = urls[i];
+            setImportStatus(`Queueing ${i + 1}/${urls.length}...`);
+            try {
+                const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_URL}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, destination: selectedUploadTarget }),
+                });
+                const d = await r.json();
+                if (!r.ok || !d?.success || !d?.job_id) {
+                    failed += 1;
+                    continue;
+                }
+                setImportStatus(`Importing ${i + 1}/${urls.length}: ${d.filename || 'file'}`);
+                const done = await waitForImportJob(d.job_id);
+                if (done) ok += 1;
+                else failed += 1;
+            } catch {
+                failed += 1;
+            }
+        }
+
+        setIsBulkImporting(false);
+        setImportStatus(`Bulk import done. Success: ${ok}, failed: ${failed}.`);
+        checkStatus();
     };
 
     const uploadLocalFiles = async (files: FileList | File[] | null) => {
@@ -490,6 +558,18 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
                             </div>
                             <h3 className="text-sm font-bold text-white/80">Import from URL</h3>
                         </div>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-white/35">
+                            Destination
+                            <select
+                                value={selectedUploadTarget}
+                                onChange={(e) => setSelectedUploadTarget(e.target.value)}
+                                className="mt-2 w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white/75 focus:outline-none focus:border-emerald-500/25"
+                            >
+                                {(uploadTargets.length > 0 ? uploadTargets : [{ key: 'imported', folder: 'imported', label: 'Imported' }]).map((t) => (
+                                    <option key={t.key} value={t.key}>{t.label} ({t.folder})</option>
+                                ))}
+                            </select>
+                        </label>
                         <input
                             value={importUrl}
                             onChange={e => setImportUrl(e.target.value)}
@@ -497,16 +577,32 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
                             placeholder="HuggingFace or Civitai link..."
                             className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/60 focus:outline-none focus:border-emerald-500/20"
                         />
+                        <textarea
+                            value={bulkImportText}
+                            onChange={(e) => setBulkImportText(e.target.value)}
+                            placeholder="Paste multiple links here (one per line or mixed text)..."
+                            rows={5}
+                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/60 focus:outline-none focus:border-emerald-500/20"
+                        />
                         {importStatus && (
                             <p className="text-[10px] text-slate-500 font-bold tracking-widest">{importStatus}</p>
                         )}
                     </div>
-                    <button
-                        onClick={handleImportUrl}
-                        className="mt-4 w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/50 transition-all"
-                    >
-                        {importJobId ? 'Processing...' : 'Import'}
-                    </button>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                            onClick={handleImportUrl}
+                            className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/50 transition-all"
+                        >
+                            {importJobId ? 'Processing...' : 'Import One'}
+                        </button>
+                        <button
+                            onClick={handleBulkImport}
+                            disabled={isBulkImporting}
+                            className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-400/25 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-200 transition-all disabled:opacity-50"
+                        >
+                            {isBulkImporting ? 'Importing...' : 'Import List'}
+                        </button>
+                    </div>
                 </div>
 
             </div>

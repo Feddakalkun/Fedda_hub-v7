@@ -1677,10 +1677,11 @@ async def install_all_free():
 class ImportUrlRequest(BaseModel):
     url: str
     hf_token: Optional[str] = None
+    destination: str = "imported"
 
 @app.post("/api/lora/import-url")
 async def lora_import_url(req: ImportUrlRequest):
-    return lora_service.import_from_url(req.url, req.hf_token)
+    return lora_service.import_from_url(req.url, req.hf_token, req.destination)
 
 
 @app.get("/api/lora/import-status/{job_id}")

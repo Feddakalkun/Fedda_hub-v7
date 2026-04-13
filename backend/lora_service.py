@@ -370,11 +370,19 @@ class LoRAService:
 
     # ─── URL import ─────────────────────────────────────────────────────────
 
-    def import_from_url(self, url: str, hf_token: Optional[str] = None) -> Dict[str, Any]:
+    def import_from_url(
+        self,
+        url: str,
+        hf_token: Optional[str] = None,
+        destination_key: str = "imported",
+    ) -> Dict[str, Any]:
         raw_name = url.split("?")[0].split("/")[-1]
         filename = raw_name if raw_name.endswith(".safetensors") else raw_name + ".safetensors"
         job_id   = str(uuid.uuid4())[:8]
-        dest     = self.lora_dir / "imported" / filename
+        destination = UPLOAD_DESTINATIONS.get(destination_key)
+        if not destination:
+            return {"success": False, "error": f"Unknown destination '{destination_key}'"}
+        dest = self.lora_dir / destination["folder"] / filename
 
         with self._lock:
             self._import_jobs[job_id] = {"status": "queued", "progress": 0, "filename": filename}
