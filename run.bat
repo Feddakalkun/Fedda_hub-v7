@@ -11,6 +11,8 @@ set "HF_HOME=%BASE_DIR%\cache\huggingface"
 set "TORCH_HOME=%BASE_DIR%\cache\torch"
 set "INSIGHTFACE_ROOT=%BASE_DIR%\cache\insightface"
 set "PIP_CACHE_DIR=%BASE_DIR%\cache\pip"
+set "YOLO_CONFIG_DIR=%BASE_DIR%\cache\ultralytics"
+set "ULTRALYTICS_SETTINGS=%BASE_DIR%\cache\ultralytics\settings.json"
 
 :: ============================================================================
 :: SERVICE DISPATCH - background services, output goes to logs/
