@@ -8,6 +8,24 @@ $RootPath = Split-Path -Parent $ScriptPath
 $RootPath = (Resolve-Path $RootPath).Path  # Ensure absolute path
 Set-Location $RootPath
 
+# Portable cache/temp roots (keep installs self-contained under install folder)
+$CacheRoot = Join-Path $RootPath "cache"
+$PipCacheDir = Join-Path $CacheRoot "pip"
+$TmpDir = Join-Path $CacheRoot "tmp"
+$TorchCacheDir = Join-Path $CacheRoot "torch"
+$HfCacheDir = Join-Path $CacheRoot "huggingface"
+$UltralyticsCacheDir = Join-Path $CacheRoot "ultralytics"
+New-Item -ItemType Directory -Path $CacheRoot, $PipCacheDir, $TmpDir, $TorchCacheDir, $HfCacheDir, $UltralyticsCacheDir -Force | Out-Null
+
+$env:PIP_CACHE_DIR = $PipCacheDir
+$env:TMP = $TmpDir
+$env:TEMP = $TmpDir
+$env:TORCH_HOME = $TorchCacheDir
+$env:HF_HOME = $HfCacheDir
+$env:XDG_CACHE_HOME = $CacheRoot
+$env:YOLO_CONFIG_DIR = $UltralyticsCacheDir
+$env:ULTRALYTICS_SETTINGS = (Join-Path $UltralyticsCacheDir "settings.json")
+
 # Toggle to pause after each major step for review
 $PauseEachStep = $false
 
