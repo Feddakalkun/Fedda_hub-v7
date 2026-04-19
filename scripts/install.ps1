@@ -132,7 +132,18 @@ function Install-MockingbirdRuntime {
         Write-Log "[Mockingbird] Creating virtual environment..."
         $VenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m venv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
         if ($VenvProc.ExitCode -ne 0 -or -not (Test-Path $VenvPy)) {
-            throw "Failed to create Mockingbird virtual environment"
+            Write-Log "[Mockingbird] Embedded Python lacks venv module, falling back to virtualenv..."
+            if (Test-Path $VenvDir) {
+                Remove-Item -LiteralPath $VenvDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            $VirtualenvBootProc = Start-Process -FilePath $PythonExe -ArgumentList "-m pip install --upgrade virtualenv --no-warn-script-location" -NoNewWindow -Wait -PassThru
+            if ($VirtualenvBootProc.ExitCode -ne 0) {
+                throw "Failed to install virtualenv for Mockingbird"
+            }
+            $VirtualenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m virtualenv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
+            if ($VirtualenvProc.ExitCode -ne 0 -or -not (Test-Path $VenvPy)) {
+                throw "Failed to create Mockingbird virtual environment (venv and virtualenv both failed)"
+            }
         }
     } else {
         Write-Log "[Mockingbird] Virtual environment already exists."
