@@ -114,96 +114,18 @@ function Install-MockingbirdRuntime {
 
     Write-Log "`n[Mockingbird] Installing dedicated XTTS runtime..."
     $MockDir = Join-Path $RootPath "mockingbird_tts"
-    $PythonRoot = Join-Path $MockDir "python310"
-    $PythonExe = Join-Path $PythonRoot "python.exe"
+    $PythonExe = Join-Path $RootPath "python_embeded\python.exe"
     $VenvDir = Join-Path $MockDir "venv"
     $VenvPy = Join-Path $VenvDir "Scripts\python.exe"
     $RepoDir = Join-Path $MockDir "xtts-api-server"
     $SpeakersDir = Join-Path $MockDir "speakers"
     $OutputDir = Join-Path $MockDir "output"
     $ModelsDir = Join-Path $MockDir "xtts_models"
-    $InstallerDir = Join-Path $MockDir "downloads"
-    $InstallerExe = Join-Path $InstallerDir "python-3.10.11-amd64.exe"
 
-    New-Item -ItemType Directory -Path $MockDir, $SpeakersDir, $OutputDir, $ModelsDir, $InstallerDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $MockDir, $SpeakersDir, $OutputDir, $ModelsDir -Force | Out-Null
 
     if (-not (Test-Path $PythonExe)) {
-        Download-File -Url "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe" -Dest $InstallerExe
-        Write-Log "[Mockingbird] Installing dedicated Python 3.10 runtime..."
-        $Args = @(
-            "/quiet",
-            "InstallAllUsers=0",
-            "PrependPath=0",
-            "Include_pip=1",
-            "Include_dev=1",
-            "Include_test=0",
-            "Include_tcltk=0",
-            "Include_doc=0",
-            "Include_launcher=0",
-            "AssociateFiles=0",
-            "Shortcuts=0",
-            "TargetDir=$PythonRoot"
-        )
-        $Proc = Start-Process -FilePath $InstallerExe -ArgumentList $Args -Wait -PassThru
-        if ($Proc.ExitCode -ne 0) {
-            throw "Mockingbird Python install failed with exit code $($Proc.ExitCode)"
-        }
-
-        # Installer may exit before python.exe is visible on disk.
-        $InstallWaitSeconds = 90
-        $FoundPython = $false
-        for ($i = 0; $i -lt $InstallWaitSeconds; $i++) {
-            if (Test-Path $PythonExe) {
-                $FoundPython = $true
-                break
-            }
-            Start-Sleep -Seconds 1
-        }
-
-        if (-not $FoundPython) {
-            $DetectedPython = Get-ChildItem -Path $MockDir -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -notlike "*\venv\*" } |
-                Select-Object -First 1
-            if ($DetectedPython) {
-                $PythonExe = $DetectedPython.FullName
-                Write-Log "[Mockingbird] Detected Python at: $PythonExe"
-                $FoundPython = $true
-            }
-        }
-
-        if (-not $FoundPython) {
-            # Fallback 1: try system py launcher for Python 3.10
-            $PyLauncher = Get-Command py.exe -ErrorAction SilentlyContinue
-            if ($PyLauncher) {
-                try {
-                    $PyProbe = & py -3.10 -c "import sys; print(sys.executable)" 2>$null
-                    if ($LASTEXITCODE -eq 0 -and $PyProbe) {
-                        $ProbePath = $PyProbe | Select-Object -First 1
-                        if (Test-Path $ProbePath) {
-                            $PythonExe = $ProbePath
-                            Write-Log "[Mockingbird] Using system Python 3.10 from py launcher: $PythonExe"
-                            $FoundPython = $true
-                        }
-                    }
-                } catch {}
-            }
-        }
-
-        if (-not $FoundPython) {
-            # Fallback 2: use bundled FEDDA runtime so install can continue.
-            $BundledPython = Join-Path $RootPath "python_embeded\python.exe"
-            if (Test-Path $BundledPython) {
-                $PythonExe = $BundledPython
-                Write-Log "[Mockingbird] WARNING: Python 3.10 not found after installer. Falling back to bundled runtime: $PythonExe"
-                $FoundPython = $true
-            }
-        }
-
-        if (-not $FoundPython) {
-            throw "Mockingbird Python installer completed, but no usable python.exe was found (local target, system 3.10, or bundled runtime)."
-        }
-    } else {
-        Write-Log "[Mockingbird] Dedicated Python already present."
+        throw "[Mockingbird] Embedded Python not found at $PythonExe"
     }
 
     if (-not (Test-Path $VenvPy)) {
