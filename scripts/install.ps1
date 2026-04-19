@@ -140,15 +140,51 @@ function Install-MockingbirdRuntime {
             "Include_dev=1",
             "Include_debug=0",
             "Include_symbols=0",
-            "SimpleInstall=1",
             "TargetDir=`"$PythonRoot`""
         )
         $PyInstallerProc = Start-Process -FilePath $InstallerExe -ArgumentList $PyInstallArgs -NoNewWindow -Wait -PassThru
-        if (($PyInstallerProc.ExitCode -ne 0 -and $PyInstallerProc.ExitCode -ne 3010) -or -not (Test-Path $PythonExe)) {
-            Start-Sleep -Seconds 2
-            if (-not (Test-Path $PythonExe)) {
-                throw "Mockingbird Python 3.10 install failed with exit code $($PyInstallerProc.ExitCode)"
+        if ($PyInstallerProc.ExitCode -ne 0 -and $PyInstallerProc.ExitCode -ne 3010) {
+            throw "Mockingbird Python 3.10 installer returned exit code $($PyInstallerProc.ExitCode)"
+        }
+        $PythonReady = $false
+        for ($i = 0; $i -lt 20; $i++) {
+            if (Test-Path $PythonExe) {
+                $PythonReady = $true
+                break
             }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $PythonReady) {
+            Write-Log "[Mockingbird] Python installer completed but target python.exe not found. Falling back to portable NuGet Python..."
+            $NuPkg = Join-Path $InstallerDir "python.3.10.11.nupkg"
+            $NuExtract = Join-Path $InstallerDir "python_nuget_extract"
+            Download-File "https://www.nuget.org/api/v2/package/python/3.10.11" $NuPkg
+            if (Test-Path $NuExtract) {
+                Remove-Item -LiteralPath $NuExtract -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Expand-Archive -Path $NuPkg -DestinationPath $NuExtract -Force
+            $NuTools = Join-Path $NuExtract "tools"
+            if (-not (Test-Path $NuTools)) {
+                throw "NuGet Python package missing tools directory at $NuTools"
+            }
+            New-Item -ItemType Directory -Path $PythonRoot -Force | Out-Null
+            Copy-Item -Path (Join-Path $NuTools "*") -Destination $PythonRoot -Recurse -Force
+            if (-not (Test-Path $PythonExe)) {
+                throw "Mockingbird Python 3.10 install failed: python.exe not found at $PythonExe"
+            }
+        }
+        $EnsurePipProc = Start-Process -FilePath $PythonExe -ArgumentList "-m ensurepip --upgrade" -NoNewWindow -Wait -PassThru
+        if ($EnsurePipProc.ExitCode -ne 0) {
+            Write-Log "[Mockingbird] WARNING: ensurepip returned exit code $($EnsurePipProc.ExitCode); continuing."
+        }
+    }
+
+    $VenvCfg = Join-Path $VenvDir "pyvenv.cfg"
+    if (Test-Path $VenvCfg) {
+        $CfgContent = Get-Content -Path $VenvCfg -Raw -ErrorAction SilentlyContinue
+        if ($CfgContent -and $CfgContent -notmatch [regex]::Escape($PythonRoot)) {
+            Write-Log "[Mockingbird] Existing venv uses a different Python runtime; rebuilding..."
+            Remove-Item -LiteralPath $VenvDir -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
