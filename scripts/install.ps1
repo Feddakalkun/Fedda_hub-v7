@@ -157,12 +157,14 @@ function Install-MockingbirdRuntime {
         if (-not $PythonReady) {
             Write-Log "[Mockingbird] Python installer completed but target python.exe not found. Falling back to portable NuGet Python..."
             $NuPkg = Join-Path $InstallerDir "python.3.10.11.nupkg"
+            $NuZip = Join-Path $InstallerDir "python.3.10.11.zip"
             $NuExtract = Join-Path $InstallerDir "python_nuget_extract"
             Download-File "https://www.nuget.org/api/v2/package/python/3.10.11" $NuPkg
             if (Test-Path $NuExtract) {
                 Remove-Item -LiteralPath $NuExtract -Recurse -Force -ErrorAction SilentlyContinue
             }
-            Expand-Archive -Path $NuPkg -DestinationPath $NuExtract -Force
+            Copy-Item -LiteralPath $NuPkg -Destination $NuZip -Force
+            Expand-Archive -Path $NuZip -DestinationPath $NuExtract -Force
             $NuTools = Join-Path $NuExtract "tools"
             if (-not (Test-Path $NuTools)) {
                 throw "NuGet Python package missing tools directory at $NuTools"
