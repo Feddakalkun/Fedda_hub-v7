@@ -56,17 +56,7 @@ COMFY_DIR = ROOT_DIR / "ComfyUI"
 SETTINGS_PATH = CONFIG_DIR / "runtime_settings.json"
 OUTPUT_DIR = COMFY_DIR / "output"
 
-COMFY_URL_DEFAULT = "http://127.0.0.1:8199"
-
-def get_comfy_url() -> str:
-    """Read ComfyUI URL from settings or environment, with local fallback."""
-    settings = load_settings()
-    cloud_config = settings.get("cloud_config", {})
-    if cloud_config.get("mode") == "remote" and cloud_config.get("url"):
-        return cloud_config["url"].rstrip("/")
-    return os.environ.get("COMFY_URL", COMFY_URL_DEFAULT).rstrip("/")
-
-COMFY_URL = COMFY_URL_DEFAULT
+COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8199")
 MOCKINGBIRD_URL = os.environ.get("MOCKINGBIRD_URL", "http://127.0.0.1:8020")
 AGENT_DB_PATH = CONFIG_DIR / "agent_memory.db"
 MEMORY_REFRESH_EVERY_TURNS = 2
@@ -96,9 +86,6 @@ def load_settings() -> dict:
 def save_settings(data: dict) -> None:
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-COMFY_URL = get_comfy_url()
 
 
 # ─────────────────────────────────────────────
@@ -166,7 +153,7 @@ async def set_civitai_key(req: CivitaiKeyRequest):
         data = load_settings()
         data["civitai_api_key"] = req.api_key.strip()
         save_settings(data)
-        return {"success": True}
+        return {"success": True, "configured": bool(data["civitai_api_key"])}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1677,55 +1664,17 @@ async def install_all_free():
 class ImportUrlRequest(BaseModel):
     url: str
     hf_token: Optional[str] = None
-    destination: str = "imported"
+    civitai_token: Optional[str] = None
 
 @app.post("/api/lora/import-url")
 async def lora_import_url(req: ImportUrlRequest):
-    return lora_service.import_from_url(req.url, req.hf_token, req.destination)
+    return lora_service.import_from_url(req.url, req.hf_token, req.civitai_token)
 
 
 @app.get("/api/lora/import-status/{job_id}")
 async def lora_import_status(job_id: str):
     return lora_service.get_import_status(job_id)
 
-
-@app.get("/api/lora/upload-targets")
-async def lora_upload_targets():
-    return {"success": True, "targets": lora_service.get_upload_destinations()}
-
-
-@app.post("/api/lora/upload")
-async def lora_upload_file(
-    file: UploadFile = File(...),
-    destination: str = Form("imported"),
-    overwrite: bool = Form(False),
-):
-    try:
-        content = await file.read()
-        result = lora_service.save_uploaded_lora(
-            filename=file.filename or "uploaded.safetensors",
-            content=content,
-            destination_key=destination,
-            overwrite=overwrite,
-        )
-        if not result.get("success"):
-            raise HTTPException(status_code=400, detail=str(result.get("error", "Upload failed")))
-        return result
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-
-
-@app.post("/api/system/cloud-config")
-async def save_cloud_config(config: Dict[str, Any]):
-    """Update cloud integration settings (Hybrid Mode)."""
-    settings = load_settings()
-    settings["cloud_config"] = config
-    save_settings(settings)
-    global COMFY_URL
-    COMFY_URL = get_comfy_url()
-    return {"success": True, "new_url": COMFY_URL}
 
 if __name__ == "__main__":
     print("[Fedda Hub v2] Starting backend on port 8000...")

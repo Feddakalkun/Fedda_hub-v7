@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Loader2, Users, Sparkles, X, DownloadCloud, ImageOff, UploadCloud } from 'lucide-react';
+import { Check, Loader2, Users, Sparkles, X, DownloadCloud, ImageOff } from 'lucide-react';
 import { FREE_LORAS } from '../config/loras';
 import { BACKEND_API } from '../config/api';
 import { CatalogShell, CatalogCard } from './layout/CatalogShell';
@@ -42,22 +42,16 @@ interface CatalogItem {
     preview_url?: string | null;
 }
 
-interface UploadTarget {
-    key: string;
-    folder: string;
-    label: string;
-}
-
 const FAMILY_PACKS: Record<LoRAFamily, PackConfig[]> = {
     'z-image':    [
         { key: 'zimage_turbo', title: 'Z-Image Turbo Celeb Pack', subtitle: 'pmczip/Z-Image-Turbo_Models' },
         { key: 'zimage_nsfw', title: 'Z-Image NSFW Pack', subtitle: 'qqnyanddld/nsfw-z-image-lora' },
-        { key: 'zimage_community', title: 'Z-Image Community Pack', subtitle: 'torestinbar/z-image-turbo' },
     ],
     qwen:         [],
     flux2klein:   [
         { key: 'flux2klein', title: 'FLUX2KLEIN Celeb Pack',  subtitle: 'pmczip/FLUX.2-klein-9B_Models' },
         { key: 'flux1dev',   title: 'FLUX.1-dev Celeb Pack',  subtitle: 'pmczip/FLUX.1-dev_Models' },
+        { key: 'flux2klein_realism_engine', title: 'Realism Engine Klein', subtitle: 'civitai.red / Realism Engine Klein' },
     ],
     flux1dev:     [{ key: 'flux1dev', title: 'FLUX.1-dev Celeb Pack', subtitle: 'pmczip/FLUX.1-dev_Models' }],
     sd15:         [
@@ -152,8 +146,6 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
     const [importUrl, setImportUrl]           = useState('');
     const [importJobId, setImportJobId]       = useState<string | null>(null);
     const [importStatus, setImportStatus]     = useState<string>('');
-    const [bulkImportText, setBulkImportText] = useState('');
-    const [isBulkImporting, setIsBulkImporting] = useState(false);
     const [previewOpen, setPreviewOpen]       = useState(false);
     const [previewTitle, setPreviewTitle]     = useState('');
     const [previewItems, setPreviewItems]     = useState<CatalogItem[]>([]);
@@ -162,11 +154,6 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
     const [packStatus, setPackStatus]         = useState<Record<string, any>>({});
     const [packCatalog, setPackCatalog]       = useState<Record<string, any>>({});
     const [previewSearch, setPreviewSearch]   = useState('');
-    const [uploadTargets, setUploadTargets]   = useState<UploadTarget[]>([]);
-    const [selectedUploadTarget, setSelectedUploadTarget] = useState('imported');
-    const [isDragOver, setIsDragOver]         = useState(false);
-    const [isUploadingLocal, setIsUploadingLocal] = useState(false);
-    const [uploadStatus, setUploadStatus]     = useState('');
 
     const isZImage = family === 'z-image';
     const packs    = FAMILY_PACKS[family] || [];
@@ -227,25 +214,6 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
         return () => clearInterval(id);
     }, [checkStatus]);
 
-    useEffect(() => {
-        let mounted = true;
-        const loadTargets = async () => {
-            try {
-                const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_UPLOAD_TARGETS}`);
-                const d = await r.json();
-                if (!mounted || !d?.success || !Array.isArray(d.targets)) return;
-                setUploadTargets(d.targets as UploadTarget[]);
-                if (!d.targets.some((t: UploadTarget) => t.key === selectedUploadTarget)) {
-                    setSelectedUploadTarget(d.targets[0]?.key || 'imported');
-                }
-            } catch {
-                if (mounted) setUploadTargets([]);
-            }
-        };
-        loadTargets();
-        return () => { mounted = false; };
-    }, [selectedUploadTarget]);
-
     // ─── Import job polling ───────────────────────────────────────────────
     useEffect(() => {
         if (!importJobId) return;
@@ -277,119 +245,12 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
             const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_URL}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: importUrl.trim(), destination: selectedUploadTarget }),
+                body: JSON.stringify({ url: importUrl.trim() }),
             });
             const d = await r.json();
             if (d.success) setImportJobId(d.job_id);
             else setImportStatus(d.error || 'Failed');
         } catch (e: any) { setImportStatus(e.message); }
-    };
-
-    const parseUrlsFromText = (raw: string): string[] => {
-        const urls = (raw.match(/https?:\/\/[^\s"'<>]+/gi) || []).map((u) => u.trim());
-        const deduped: string[] = [];
-        const seen = new Set<string>();
-        for (const url of urls) {
-            if (!seen.has(url)) {
-                seen.add(url);
-                deduped.push(url);
-            }
-        }
-        return deduped;
-    };
-
-    const waitForImportJob = async (jobId: string, timeoutMs = 20 * 60 * 1000): Promise<boolean> => {
-        const started = Date.now();
-        while (Date.now() - started < timeoutMs) {
-            const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_STATUS}/${jobId}`);
-            const d = await r.json();
-            if (!d?.success) return false;
-            if (d.status === 'completed') return true;
-            if (d.status === 'error') return false;
-            await new Promise((resolve) => setTimeout(resolve, 1200));
-        }
-        return false;
-    };
-
-    const handleBulkImport = async () => {
-        if (isBulkImporting) return;
-        const urls = parseUrlsFromText(bulkImportText);
-        if (urls.length === 0) {
-            setImportStatus('No valid URLs found in pasted text.');
-            return;
-        }
-
-        setIsBulkImporting(true);
-        let ok = 0;
-        let failed = 0;
-
-        for (let i = 0; i < urls.length; i += 1) {
-            const url = urls[i];
-            setImportStatus(`Queueing ${i + 1}/${urls.length}...`);
-            try {
-                const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_URL}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, destination: selectedUploadTarget }),
-                });
-                const d = await r.json();
-                if (!r.ok || !d?.success || !d?.job_id) {
-                    failed += 1;
-                    continue;
-                }
-                setImportStatus(`Importing ${i + 1}/${urls.length}: ${d.filename || 'file'}`);
-                const done = await waitForImportJob(d.job_id);
-                if (done) ok += 1;
-                else failed += 1;
-            } catch {
-                failed += 1;
-            }
-        }
-
-        setIsBulkImporting(false);
-        setImportStatus(`Bulk import done. Success: ${ok}, failed: ${failed}.`);
-        checkStatus();
-    };
-
-    const uploadLocalFiles = async (files: FileList | File[] | null) => {
-        if (!files || files.length === 0) return;
-        const selected = Array.from(files).filter((f) =>
-            ['.safetensors', '.ckpt', '.pt', '.pth', '.bin'].some((ext) => f.name.toLowerCase().endsWith(ext))
-        );
-        if (selected.length === 0) {
-            setUploadStatus('No valid LoRA files found. Use .safetensors/.ckpt/.pt/.pth/.bin');
-            return;
-        }
-
-        setIsUploadingLocal(true);
-        setUploadStatus(`Uploading ${selected.length} file(s)...`);
-        let ok = 0;
-        let failed = 0;
-
-        for (const file of selected) {
-            try {
-                const form = new FormData();
-                form.append('file', file);
-                form.append('destination', selectedUploadTarget);
-                form.append('overwrite', 'false');
-
-                const r = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_UPLOAD}`, {
-                    method: 'POST',
-                    body: form,
-                });
-                const d = await r.json();
-                if (!r.ok || !d?.success) throw new Error(d?.detail || d?.error || 'Upload failed');
-                ok += 1;
-                setUploadStatus(`Uploaded ${ok}/${selected.length}: ${d.path || file.name}`);
-            } catch {
-                failed += 1;
-            }
-        }
-
-        setIsUploadingLocal(false);
-        if (failed === 0) setUploadStatus(`Done. Uploaded ${ok} file(s).`);
-        else setUploadStatus(`Uploaded ${ok} file(s), failed ${failed}.`);
-        checkStatus();
     };
 
     const handleInstallAllFree = async () => {
@@ -496,60 +357,6 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
                     );
                 })}
 
-                {/* ── Upload local LoRAs ── */}
-                <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 flex flex-col justify-between">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
-                                <UploadCloud className="w-5 h-5 text-white/40" />
-                            </div>
-                            <h3 className="text-sm font-bold text-white/80">Upload Local LoRA</h3>
-                        </div>
-
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-white/35">
-                            LoRA Type / Destination
-                            <select
-                                value={selectedUploadTarget}
-                                onChange={(e) => setSelectedUploadTarget(e.target.value)}
-                                className="mt-2 w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white/75 focus:outline-none focus:border-emerald-500/25"
-                            >
-                                {(uploadTargets.length > 0 ? uploadTargets : [{ key: 'imported', folder: 'imported', label: 'Imported' }]).map((t) => (
-                                    <option key={t.key} value={t.key}>{t.label} ({t.folder})</option>
-                                ))}
-                            </select>
-                        </label>
-
-                        <div
-                            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                            onDragEnter={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                            onDragLeave={(e) => { e.preventDefault(); setIsDragOver(false); }}
-                            onDrop={(e) => {
-                                e.preventDefault();
-                                setIsDragOver(false);
-                                void uploadLocalFiles(e.dataTransfer.files);
-                            }}
-                            className={`rounded-2xl border border-dashed p-5 text-center transition-all ${isDragOver ? 'border-emerald-400/60 bg-emerald-500/10' : 'border-white/15 bg-black/20'}`}
-                        >
-                            <p className="text-xs font-bold text-white/70">Drag and drop LoRA files here</p>
-                            <p className="text-[10px] text-white/35 mt-1">.safetensors, .ckpt, .pt, .pth, .bin</p>
-                            <label className="mt-3 inline-block px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/60 cursor-pointer">
-                                {isUploadingLocal ? 'Uploading...' : 'Choose Files'}
-                                <input
-                                    type="file"
-                                    multiple
-                                    accept=".safetensors,.ckpt,.pt,.pth,.bin"
-                                    className="hidden"
-                                    onChange={(e) => void uploadLocalFiles(e.target.files)}
-                                />
-                            </label>
-                        </div>
-
-                        {uploadStatus && (
-                            <p className="text-[10px] text-slate-400 font-bold tracking-widest">{uploadStatus}</p>
-                        )}
-                    </div>
-                </div>
-
                 {/* ── Manual import ── */}
                 <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 flex flex-col justify-between">
                     <div className="space-y-4">
@@ -559,18 +366,6 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
                             </div>
                             <h3 className="text-sm font-bold text-white/80">Import from URL</h3>
                         </div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-white/35">
-                            Destination
-                            <select
-                                value={selectedUploadTarget}
-                                onChange={(e) => setSelectedUploadTarget(e.target.value)}
-                                className="mt-2 w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white/75 focus:outline-none focus:border-emerald-500/25"
-                            >
-                                {(uploadTargets.length > 0 ? uploadTargets : [{ key: 'imported', folder: 'imported', label: 'Imported' }]).map((t) => (
-                                    <option key={t.key} value={t.key}>{t.label} ({t.folder})</option>
-                                ))}
-                            </select>
-                        </label>
                         <input
                             value={importUrl}
                             onChange={e => setImportUrl(e.target.value)}
@@ -578,32 +373,16 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
                             placeholder="HuggingFace or Civitai link..."
                             className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/60 focus:outline-none focus:border-emerald-500/20"
                         />
-                        <textarea
-                            value={bulkImportText}
-                            onChange={(e) => setBulkImportText(e.target.value)}
-                            placeholder="Paste multiple links here (one per line or mixed text)..."
-                            rows={5}
-                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/60 focus:outline-none focus:border-emerald-500/20"
-                        />
                         {importStatus && (
                             <p className="text-[10px] text-slate-500 font-bold tracking-widest">{importStatus}</p>
                         )}
                     </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                        <button
-                            onClick={handleImportUrl}
-                            className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/50 transition-all"
-                        >
-                            {importJobId ? 'Processing...' : 'Import One'}
-                        </button>
-                        <button
-                            onClick={handleBulkImport}
-                            disabled={isBulkImporting}
-                            className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-400/25 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-200 transition-all disabled:opacity-50"
-                        >
-                            {isBulkImporting ? 'Importing...' : 'Import List'}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleImportUrl}
+                        className="mt-4 w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/50 transition-all"
+                    >
+                        {importJobId ? 'Processing...' : 'Import'}
+                    </button>
                 </div>
 
             </div>

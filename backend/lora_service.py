@@ -12,6 +12,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import requests
 
@@ -27,11 +28,6 @@ PACKS: Dict[str, Dict[str, str]] = {
     },
     "zimage_nsfw": {
         "hf_repo":       "qqnyanddld/nsfw-z-image-lora",
-        "hf_type":       "model",
-        "dest":          "zimage_turbo",
-    },
-    "zimage_community": {
-        "hf_repo":       "torestinbar/z-image-turbo",
         "hf_type":       "model",
         "dest":          "zimage_turbo",
     },
@@ -52,6 +48,16 @@ PACKS: Dict[str, Dict[str, str]] = {
         "dest":          "flux1dev",
         "img_subfolder": "Flux1D_Images",
     },
+    "flux2klein_realism_engine": {
+        "dest": "flux2klein",
+        "static_items": [
+            {
+                "name": "Realism Engine Klein",
+                "file": "realism-engine-klein.safetensors",
+                "url":  "https://civitai.red/api/download/models/2679241?type=Model&format=SafeTensor",
+            }
+        ],
+    },
     "sd15": {
         "hf_repo":  "pmczip/SD1.5_LoRa_Models",
         "hf_type":  "model",
@@ -70,22 +76,6 @@ PACKS: Dict[str, Dict[str, str]] = {
         "img_subfolder": "SDXL_Images",
     },
 }
-
-UPLOAD_DESTINATIONS: Dict[str, Dict[str, str]] = {
-    "imported": {"folder": "imported", "label": "Imported"},
-    "starter": {"folder": "starter", "label": "Starter"},
-    "zimage_turbo": {"folder": "zimage_turbo", "label": "Z-Image"},
-    "flux2klein": {"folder": "flux2klein", "label": "FLUX2KLEIN"},
-    "flux1dev": {"folder": "flux1dev", "label": "FLUX.1-dev"},
-    "sd15": {"folder": "sd15", "label": "SD 1.5"},
-    "sd15-lycoris": {"folder": "sd15-lycoris", "label": "SD 1.5 LyCORIS"},
-    "sdxl": {"folder": "sdxl", "label": "SDXL"},
-    "wan22": {"folder": "wan22", "label": "WAN 2.2"},
-    "ltx": {"folder": "ltx", "label": "LTX"},
-    "qwen": {"folder": "qwen", "label": "QWEN"},
-}
-
-ALLOWED_UPLOAD_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin"}
 
 FREE_LORAS = [
     {
@@ -126,10 +116,52 @@ class LoRAService:
         self._import_jobs: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
 
+    # ─── Runtime token helpers ─────────────────────────────────────────────
+
+    def _load_runtime_settings(self) -> Dict[str, Any]:
+        settings_path = self.root / "config" / "runtime_settings.json"
+        try:
+            if settings_path.exists():
+                import json
+                return json.loads(settings_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        return {}
+
+    def _resolve_download_url(
+        self,
+        url: str,
+        hf_token: Optional[str] = None,
+        civitai_token: Optional[str] = None,
+    ) -> str:
+        """
+        Resolve provider-specific URL auth, similar to HF token auto-injection.
+        - Civitai: append ?token=<key> when URL host is civitai and token is missing.
+        """
+        parsed = urlparse(url)
+        host = (parsed.netloc or "").lower()
+
+        if "civitai.com" in host or "civitai.red" in host:
+            token = (civitai_token or "").strip()
+            if not token:
+                settings = self._load_runtime_settings()
+                token = str(settings.get("civitai_api_key") or "").strip()
+            if token:
+                q = dict(parse_qsl(parsed.query, keep_blank_values=True))
+                if "token" not in q:
+                    q["token"] = token
+                    return urlunparse(parsed._replace(query=urlencode(q, doseq=True)))
+
+        return url
+
     # ─── HuggingFace helpers ────────────────────────────────────────────────
 
     def _hf_file_url(self, pack_key: str, filename: str) -> str:
         pack = PACKS[pack_key]
+        for item in pack.get("static_items", []):
+            if item.get("file") == filename:
+                return item.get("url", "")
+
         repo = pack["hf_repo"]
         if pack["hf_type"] == "dataset":
             return f"https://huggingface.co/datasets/{repo}/resolve/main/{filename}"
@@ -157,21 +189,23 @@ class LoRAService:
 
     def _fetch_hf_catalog(self, pack_key: str) -> List[Dict[str, Any]]:
         """Fetch file listing from HuggingFace with cache."""
+        pack = PACKS.get(pack_key)
+        if not pack:
+            return []
+        if pack.get("static_items"):
+            return []
+
         now = time.time()
         cached = self._catalog_cache.get(pack_key)
         if cached and (now - cached[0]) < self._cache_ttl:
             return cached[1]
 
-        pack = PACKS.get(pack_key)
-        if not pack:
-            return []
-
         repo     = pack["hf_repo"]
         hf_type  = pack["hf_type"]
         api_url  = (
-            f"https://huggingface.co/api/datasets/{repo}/tree/main?recursive=1"
+            f"https://huggingface.co/api/datasets/{repo}/tree/main"
             if hf_type == "dataset"
-            else f"https://huggingface.co/api/models/{repo}/tree/main?recursive=1"
+            else f"https://huggingface.co/api/models/{repo}/tree/main"
         )
 
         try:
@@ -216,24 +250,39 @@ class LoRAService:
         if pack_key not in PACKS:
             return {"success": False, "error": "Unknown pack"}
 
-        hf_files = self._fetch_hf_catalog(pack_key)
+        pack = PACKS[pack_key]
         installed = self.get_installed()
 
         items: List[Dict[str, Any]] = []
-        for hf_item in hf_files[:limit]:
-            filename = Path(hf_item.get("path", "")).name
-            if not filename:
-                continue
-            basename = Path(filename).stem
-            size_bytes = hf_item.get("size", 0)
+        if pack.get("static_items"):
+            for item in pack.get("static_items", [])[:limit]:
+                filename = item.get("file", "")
+                if not filename:
+                    continue
+                basename = Path(filename).stem
+                items.append({
+                    "name":        item.get("name") or basename.replace("_", " "),
+                    "file":        filename,
+                    "installed":   filename in installed,
+                    "size_mb":     item.get("size_mb"),
+                    "preview_url": item.get("preview_url"),
+                })
+        else:
+            hf_files = self._fetch_hf_catalog(pack_key)
+            for hf_item in hf_files[:limit]:
+                filename = Path(hf_item.get("path", "")).name
+                if not filename:
+                    continue
+                basename = Path(filename).stem
+                size_bytes = hf_item.get("size", 0)
 
-            items.append({
-                "name":        basename.replace("_", " "),
-                "file":        filename,
-                "installed":   filename in installed,
-                "size_mb":     round(size_bytes / (1024 * 1024), 1) if size_bytes else None,
-                "preview_url": self._preview_url(pack_key, basename),
-            })
+                items.append({
+                    "name":        basename.replace("_", " "),
+                    "file":        filename,
+                    "installed":   filename in installed,
+                    "size_mb":     round(size_bytes / (1024 * 1024), 1) if size_bytes else None,
+                    "preview_url": self._preview_url(pack_key, basename),
+                })
 
         # Installed first, then alphabetical
         items.sort(key=lambda x: (not x["installed"], x["name"].lower()))
@@ -279,6 +328,7 @@ class LoRAService:
         filename: str,
         pack_key: Optional[str] = None,
         hf_token: Optional[str] = None,
+        civitai_token: Optional[str] = None,
     ) -> None:
         with self._lock:
             self._downloads[filename] = {"status": "downloading", "progress": 0, "pack_key": pack_key}
@@ -288,7 +338,8 @@ class LoRAService:
             if hf_token:
                 headers["Authorization"] = f"Bearer {hf_token}"
 
-            resp = requests.get(url, stream=True, timeout=60, headers=headers)
+            resolved_url = self._resolve_download_url(url, hf_token=hf_token, civitai_token=civitai_token)
+            resp = requests.get(resolved_url, stream=True, timeout=60, headers=headers)
             resp.raise_for_status()
 
             total      = int(resp.headers.get("content-length", 0))
@@ -324,6 +375,8 @@ class LoRAService:
         if dest.exists() and dest.stat().st_size > 10_000:
             return {"success": True, "status": "already_installed"}
         url = self._hf_file_url(pack_key, filename)
+        if not url:
+            return {"success": False, "error": "No download URL found for item"}
         threading.Thread(
             target=self._do_download,
             args=(url, dest, filename, pack_key),
@@ -343,6 +396,8 @@ class LoRAService:
             for item in pending:
                 dest = self.lora_dir / pack["dest"] / item["file"]
                 url  = self._hf_file_url(pack_key, item["file"])
+                if not url:
+                    continue
                 self._do_download(url, dest, item["file"], pack_key)
 
         threading.Thread(target=_task, daemon=True).start()
@@ -379,15 +434,12 @@ class LoRAService:
         self,
         url: str,
         hf_token: Optional[str] = None,
-        destination_key: str = "imported",
+        civitai_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         raw_name = url.split("?")[0].split("/")[-1]
         filename = raw_name if raw_name.endswith(".safetensors") else raw_name + ".safetensors"
         job_id   = str(uuid.uuid4())[:8]
-        destination = UPLOAD_DESTINATIONS.get(destination_key)
-        if not destination:
-            return {"success": False, "error": f"Unknown destination '{destination_key}'"}
-        dest = self.lora_dir / destination["folder"] / filename
+        dest     = self.lora_dir / "imported" / filename
 
         with self._lock:
             self._import_jobs[job_id] = {"status": "queued", "progress": 0, "filename": filename}
@@ -398,6 +450,7 @@ class LoRAService:
             try:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 direct = url.replace("/blob/", "/resolve/") if "/blob/" in url else url
+                direct = self._resolve_download_url(direct, hf_token=hf_token, civitai_token=civitai_token)
                 headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
 
                 resp  = requests.get(direct, stream=True, timeout=60, headers=headers)
@@ -435,65 +488,6 @@ class LoRAService:
         if not job:
             return {"success": False, "error": "Job not found"}
         return {"success": True, **job}
-
-    # ─── Local file upload ───────────────────────────────────────────────────
-
-    def get_upload_destinations(self) -> List[Dict[str, str]]:
-        return [
-            {"key": key, "folder": meta["folder"], "label": meta["label"]}
-            for key, meta in UPLOAD_DESTINATIONS.items()
-        ]
-
-    def save_uploaded_lora(
-        self,
-        filename: str,
-        content: bytes,
-        destination_key: str = "imported",
-        overwrite: bool = False,
-    ) -> Dict[str, Any]:
-        destination = UPLOAD_DESTINATIONS.get(destination_key)
-        if not destination:
-            return {"success": False, "error": f"Unknown destination '{destination_key}'"}
-
-        safe_name = Path(filename or "").name.strip()
-        if not safe_name:
-            return {"success": False, "error": "Missing filename"}
-
-        ext = Path(safe_name).suffix.lower()
-        if ext not in ALLOWED_UPLOAD_EXTENSIONS:
-            allowed = ", ".join(sorted(ALLOWED_UPLOAD_EXTENSIONS))
-            return {"success": False, "error": f"Unsupported file type '{ext}'. Allowed: {allowed}"}
-
-        if not content:
-            return {"success": False, "error": "Empty file"}
-
-        target_dir = self.lora_dir / destination["folder"]
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        target_file = target_dir / safe_name
-        if target_file.exists() and not overwrite:
-            stem = target_file.stem
-            suffix = target_file.suffix
-            idx = 1
-            while True:
-                candidate = target_dir / f"{stem}_{idx}{suffix}"
-                if not candidate.exists():
-                    target_file = candidate
-                    break
-                idx += 1
-
-        with open(target_file, "wb") as fh:
-            fh.write(content)
-
-        rel_path = str(target_file.relative_to(self.lora_dir)).replace("\\", "/")
-        size_mb = round(target_file.stat().st_size / (1024 * 1024), 2)
-        return {
-            "success": True,
-            "filename": target_file.name,
-            "path": rel_path,
-            "size_mb": size_mb,
-            "destination": destination_key,
-        }
 
 
 lora_service = LoRAService(Path(__file__).parent.parent)
