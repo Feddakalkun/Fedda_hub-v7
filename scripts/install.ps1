@@ -114,7 +114,10 @@ function Install-MockingbirdRuntime {
 
     Write-Log "`n[Mockingbird] Installing dedicated XTTS runtime..."
     $MockDir = Join-Path $RootPath "mockingbird_tts"
-    $PythonExe = Join-Path $RootPath "python_embeded\python.exe"
+    $PythonRoot = Join-Path $MockDir "python310"
+    $PythonExe = Join-Path $PythonRoot "python.exe"
+    $InstallerDir = Join-Path $MockDir "downloads"
+    $InstallerExe = Join-Path $InstallerDir "python-3.10.11-amd64.exe"
     $VenvDir = Join-Path $MockDir "venv"
     $VenvPy = Join-Path $VenvDir "Scripts\python.exe"
     $RepoDir = Join-Path $MockDir "xtts-api-server"
@@ -122,28 +125,38 @@ function Install-MockingbirdRuntime {
     $OutputDir = Join-Path $MockDir "output"
     $ModelsDir = Join-Path $MockDir "xtts_models"
 
-    New-Item -ItemType Directory -Path $MockDir, $SpeakersDir, $OutputDir, $ModelsDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $MockDir, $SpeakersDir, $OutputDir, $ModelsDir, $InstallerDir -Force | Out-Null
 
     if (-not (Test-Path $PythonExe)) {
-        throw "[Mockingbird] Embedded Python not found at $PythonExe"
+        Write-Log "[Mockingbird] Installing dedicated Python 3.10 runtime..."
+        Download-File "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe" $InstallerExe
+        $PyInstallArgs = @(
+            "/quiet",
+            "InstallAllUsers=0",
+            "PrependPath=0",
+            "Include_launcher=0",
+            "Include_pip=1",
+            "Include_test=0",
+            "Include_dev=1",
+            "Include_debug=0",
+            "Include_symbols=0",
+            "SimpleInstall=1",
+            "TargetDir=`"$PythonRoot`""
+        )
+        $PyInstallerProc = Start-Process -FilePath $InstallerExe -ArgumentList $PyInstallArgs -NoNewWindow -Wait -PassThru
+        if (($PyInstallerProc.ExitCode -ne 0 -and $PyInstallerProc.ExitCode -ne 3010) -or -not (Test-Path $PythonExe)) {
+            Start-Sleep -Seconds 2
+            if (-not (Test-Path $PythonExe)) {
+                throw "Mockingbird Python 3.10 install failed with exit code $($PyInstallerProc.ExitCode)"
+            }
+        }
     }
 
     if (-not (Test-Path $VenvPy)) {
         Write-Log "[Mockingbird] Creating virtual environment..."
         $VenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m venv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
         if ($VenvProc.ExitCode -ne 0 -or -not (Test-Path $VenvPy)) {
-            Write-Log "[Mockingbird] Embedded Python lacks venv module, falling back to virtualenv..."
-            if (Test-Path $VenvDir) {
-                Remove-Item -LiteralPath $VenvDir -Recurse -Force -ErrorAction SilentlyContinue
-            }
-            $VirtualenvBootProc = Start-Process -FilePath $PythonExe -ArgumentList "-m pip install --upgrade virtualenv --no-warn-script-location" -NoNewWindow -Wait -PassThru
-            if ($VirtualenvBootProc.ExitCode -ne 0) {
-                throw "Failed to install virtualenv for Mockingbird"
-            }
-            $VirtualenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m virtualenv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
-            if ($VirtualenvProc.ExitCode -ne 0 -or -not (Test-Path $VenvPy)) {
-                throw "Failed to create Mockingbird virtual environment (venv and virtualenv both failed)"
-            }
+            throw "Failed to create Mockingbird virtual environment"
         }
     } else {
         Write-Log "[Mockingbird] Virtual environment already exists."
