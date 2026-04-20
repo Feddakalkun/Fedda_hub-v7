@@ -112,7 +112,15 @@ class WorkflowService:
         is_api = self.is_api_format(workflow)
         print(f"[WorkflowService] Preparing payload. is_api={is_api}")
 
-        for param_key, param_value in user_params.items():
+        # Ensure LoRA placeholders are handled even when frontend sends no `loras`.
+        # Without this, workflows with a baked-in default LoRA name can fail validation
+        # on machines that don't have that specific file installed.
+        effective_params = dict(user_params or {})
+        for input_key, input_info in mapping.get("inputs", {}).items():
+            if input_info.get("type") == "loras" and input_key not in effective_params:
+                effective_params[input_key] = []
+
+        for param_key, param_value in effective_params.items():
             if param_key in mapping["inputs"]:
                 input_info = mapping["inputs"][param_key]
                 node_ids_raw = input_info.get("node_ids")
