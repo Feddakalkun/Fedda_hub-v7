@@ -745,6 +745,22 @@ if (Test-Path $PreviewSetupScript) {
     }
 }
 
+# Ensure Z-Image core model files exist on fresh install so generation does not fail validation.
+$EnsureZImageScript = Join-Path $ScriptPath "ensure_zimage_core_models.ps1"
+if (Test-Path $EnsureZImageScript) {
+    try {
+        Write-Step "Ensuring Z-Image core models..." "Yellow"
+        & powershell -ExecutionPolicy Bypass -File "$EnsureZImageScript" -SilentMode
+        if ($LASTEXITCODE -eq 0) {
+            Write-Step "Z-Image core models ready." "Green"
+        } else {
+            Write-Step "WARNING: Z-Image core model ensure returned code $LASTEXITCODE (non-fatal)." "Yellow"
+        }
+    } catch {
+        Write-Step "WARNING: Z-Image core model ensure failed (non-fatal)." "Yellow"
+    }
+}
+
 # ============================================================================
 # 7. SMOKE TEST
 # ============================================================================
