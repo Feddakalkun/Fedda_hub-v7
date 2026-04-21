@@ -28,6 +28,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+from agent_runtime import AgentRuntime
 
 # ─────────────────────────────────────────────
 # App & CORS
@@ -86,6 +87,62 @@ def load_settings() -> dict:
 def save_settings(data: dict) -> None:
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _agent_default_settings() -> Dict[str, str]:
+    return {
+        "agent_mode": "plan_confirm_execute",
+        "permission_mode": "per_action",
+        "sandbox_root": str(ROOT_DIR),
+        "model_profile": "balanced",
+    }
+
+
+def _get_agent_settings() -> Dict[str, str]:
+    data = load_settings()
+    defaults = _agent_default_settings()
+    merged: Dict[str, str] = {
+        "agent_mode": str(data.get("agent_mode") or defaults["agent_mode"]).strip().lower(),
+        "permission_mode": str(data.get("permission_mode") or defaults["permission_mode"]).strip().lower(),
+        "sandbox_root": str(data.get("sandbox_root") or defaults["sandbox_root"]).strip(),
+        "model_profile": str(data.get("model_profile") or defaults["model_profile"]).strip().lower(),
+    }
+    if merged["agent_mode"] != "plan_confirm_execute":
+        merged["agent_mode"] = defaults["agent_mode"]
+    if merged["permission_mode"] not in {"per_action", "session_trust"}:
+        merged["permission_mode"] = defaults["permission_mode"]
+    if merged["model_profile"] not in {"fast", "balanced", "max_reasoning"}:
+        merged["model_profile"] = defaults["model_profile"]
+    if not merged["sandbox_root"]:
+        merged["sandbox_root"] = defaults["sandbox_root"]
+    return merged
+
+
+def _save_agent_settings(payload: Dict[str, Any]) -> Dict[str, str]:
+    data = load_settings()
+    merged = _get_agent_settings()
+    if "agent_mode" in payload:
+        merged["agent_mode"] = str(payload.get("agent_mode") or merged["agent_mode"]).strip().lower()
+    if "permission_mode" in payload:
+        merged["permission_mode"] = str(payload.get("permission_mode") or merged["permission_mode"]).strip().lower()
+    if "sandbox_root" in payload:
+        merged["sandbox_root"] = str(payload.get("sandbox_root") or merged["sandbox_root"]).strip()
+    if "model_profile" in payload:
+        merged["model_profile"] = str(payload.get("model_profile") or merged["model_profile"]).strip().lower()
+
+    defaults = _agent_default_settings()
+    if merged["agent_mode"] != "plan_confirm_execute":
+        merged["agent_mode"] = defaults["agent_mode"]
+    if merged["permission_mode"] not in {"per_action", "session_trust"}:
+        merged["permission_mode"] = defaults["permission_mode"]
+    if merged["model_profile"] not in {"fast", "balanced", "max_reasoning"}:
+        merged["model_profile"] = defaults["model_profile"]
+    if not merged["sandbox_root"]:
+        merged["sandbox_root"] = defaults["sandbox_root"]
+
+    data.update(merged)
+    save_settings(data)
+    return merged
 
 
 # ─────────────────────────────────────────────
@@ -548,6 +605,30 @@ class FishModelDownloadRequest(BaseModel):
     model_path: Optional[str] = None
 
 
+class AgentSettingsRequest(BaseModel):
+    agent_mode: Optional[str] = None
+    permission_mode: Optional[str] = None
+    sandbox_root: Optional[str] = None
+    model_profile: Optional[str] = None
+
+
+class AgentRunRequest(BaseModel):
+    session_id: str
+    message: str
+    auto_execute: bool = False
+
+
+class AgentApproveRequest(BaseModel):
+    run_id: str
+    action_ids: Optional[List[int]] = None
+    approve_all: bool = False
+
+
+class AgentDenyRequest(BaseModel):
+    run_id: str
+    action_ids: Optional[List[int]] = None
+
+
 def _ollama_chat_text(
     prompt: str,
     history: List[Dict[str, Any]],
@@ -785,6 +866,99 @@ async def refresh_chat_memory(session_id: str):
         "turn_count": turn_count,
         "memory_refresh_every_turns": MEMORY_REFRESH_EVERY_TURNS,
     }
+
+
+@app.get("/api/agent/settings")
+async def get_agent_settings():
+    return {"success": True, "settings": _get_agent_settings()}
+
+
+@app.post("/api/agent/settings")
+async def set_agent_settings(req: AgentSettingsRequest):
+    try:
+        updated = _save_agent_settings(req.dict(exclude_none=True))
+        return {"success": True, "settings": updated}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/agent/run")
+async def agent_run(req: AgentRunRequest):
+    try:
+        text = (req.message or "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="message is required.")
+        _ensure_session(req.session_id)
+        history = _get_session_history(req.session_id, limit=120)
+        settings = _get_agent_settings()
+        run_payload = agent_runtime.create_run(
+            session_id=req.session_id,
+            user_message=text,
+            settings=settings,
+            history=history,
+            auto_execute=bool(req.auto_execute),
+        )
+        _append_message(req.session_id, "user", text)
+        run = run_payload.get("run", {})
+        summary = (
+            f"Plan ready.\n{run.get('plan_text', '')}\n\n"
+            f"Risk: {run.get('risk_summary', 'n/a')}\n"
+            f"Pending actions: {len([a for a in run.get('actions', []) if a.get('status') == 'pending_approval'])}."
+        )
+        _append_message(req.session_id, "assistant", summary)
+        state = _ensure_session(req.session_id)
+        _set_session_memory_and_turns(
+            req.session_id,
+            str(state.get("memory", "") or ""),
+            int(state.get("turn_count", 0) or 0) + 1,
+        )
+        return {"success": True, **run_payload, "assistant_response": summary}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/agent/approve")
+async def agent_approve(req: AgentApproveRequest):
+    try:
+        settings = _get_agent_settings()
+        payload = agent_runtime.execute_run(
+            run_id=req.run_id,
+            settings=settings,
+            approved_action_ids=None if req.approve_all else req.action_ids,
+            auto_all=bool(req.approve_all),
+        )
+        return {"success": True, **payload}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/agent/deny")
+async def agent_deny(req: AgentDenyRequest):
+    try:
+        payload = agent_runtime.deny_actions(run_id=req.run_id, action_ids=req.action_ids)
+        return {"success": True, **payload}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/agent/runs/{run_id}")
+async def agent_get_run(run_id: str):
+    try:
+        payload = agent_runtime.get_run(run_id=run_id)
+        return {"success": True, **payload}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/api/agent/rollback/{run_id}")
+async def agent_rollback(run_id: str):
+    try:
+        payload = agent_runtime.rollback_run(run_id=run_id)
+        return {"success": True, **payload}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/api/chat/voices")
@@ -1225,6 +1399,62 @@ def _get_ollama_vision_model() -> Optional[str]:
         return None
     except Exception:
         return None
+
+
+def _get_ollama_model_names() -> List[str]:
+    try:
+        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
+        if not resp.ok:
+            return []
+        return [str(m.get("name", "")).strip() for m in resp.json().get("models", []) if str(m.get("name", "")).strip()]
+    except Exception:
+        return []
+
+
+def _resolve_agent_model_for_profile(profile: str) -> Optional[str]:
+    models = _get_ollama_model_names()
+    if not models:
+        return None
+
+    def pick(priority: List[str]) -> Optional[str]:
+        for p in priority:
+            for model in models:
+                lowered = model.lower()
+                if p in lowered and "vision" not in lowered and "embed" not in lowered:
+                    return model
+        return None
+
+    profile_normalized = (profile or "balanced").strip().lower()
+    if profile_normalized == "fast":
+        chosen = pick(["3b", "2b", "phi3", "llama3.2", "gemma2:2b", "qwen2.5:3b"])
+    elif profile_normalized == "max_reasoning":
+        chosen = pick(["70b", "34b", "32b", "27b", "22b", "20b", "14b", "qwen3", "gpt-oss:20b"])
+    else:
+        chosen = pick(["14b", "12b", "8b", "7b", "llama3.1", "llama3", "mistral", "dolphin-llama3", "zarigata"])
+
+    if chosen:
+        return chosen
+    return _get_ollama_text_model()
+
+
+def _agent_llm(prompt: str, history: List[Dict[str, Any]], profile: Optional[str]) -> str:
+    model_hint = _resolve_agent_model_for_profile(profile or "balanced")
+    return _ollama_chat_text(
+        prompt=prompt,
+        history=history,
+        system_instruction=(
+            "You are FEDDA Agent Brain planner/executor assistant. "
+            "Return precise, deterministic outputs that follow instructions exactly."
+        ),
+        model_hint=model_hint,
+    )
+
+
+agent_runtime = AgentRuntime(
+    root_dir=ROOT_DIR,
+    db_path=AGENT_DB_PATH,
+    llm_fn=_agent_llm,
+)
 
 
 def _clean_caption_text(text: str) -> str:

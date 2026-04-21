@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Bot, Download, MessageSquare, Mic, RefreshCw, RotateCcw, Send, Volume2, VolumeX } from 'lucide-react';
+import { Bot, Check, Download, MessageSquare, Mic, RefreshCw, RotateCcw, Send, ShieldCheck, ShieldX, Undo2, Volume2, VolumeX, X } from 'lucide-react';
 import { BACKEND_API } from '../config/api';
 
 type ChatRole = 'user' | 'assistant';
@@ -25,6 +25,39 @@ interface ChatModelPreset {
   description: string;
 }
 
+interface AgentAction {
+  id: number;
+  index: number;
+  tool_name: string;
+  args: Record<string, unknown>;
+  preview_text: string;
+  status: string;
+  result?: Record<string, unknown>;
+  error_text?: string;
+}
+
+interface AgentRun {
+  run_id: string;
+  session_id: string;
+  user_message: string;
+  status: string;
+  interpretation: string;
+  plan_text: string;
+  risk_summary: string;
+  permission_mode: 'per_action' | 'session_trust';
+  model_profile: 'fast' | 'balanced' | 'max_reasoning';
+  sandbox_root: string;
+  rollback_ready: boolean;
+  actions: AgentAction[];
+}
+
+interface AgentSettings {
+  agent_mode: 'plan_confirm_execute';
+  permission_mode: 'per_action' | 'session_trust';
+  sandbox_root: string;
+  model_profile: 'fast' | 'balanced' | 'max_reasoning';
+}
+
 type BrowserSpeechRecognition = {
   continuous: boolean;
   interimResults: boolean;
@@ -45,6 +78,7 @@ const AUTO_SPEAK_KEY = 'fedda_agent_auto_speak_v1';
 const VOICE_KEY = 'fedda_agent_voice_v1';
 const TTS_ENGINE_KEY = 'fedda_agent_tts_engine_v1';
 const CHAT_MODEL_KEY = 'fedda_agent_chat_model_v1';
+const AGENT_ENABLED_KEY = 'fedda_agent_enabled_v1';
 const DEFAULT_MOCKINGBIRD_VOICE = 'charlotte.wav';
 const FALLBACK_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
 const DEFAULT_MEMORY_REFRESH_TURNS = 2;
@@ -179,6 +213,23 @@ export const AgentChatPage = () => {
     }
   });
   const [panelOpen, setPanelOpen] = useState(false);
+  const [agentEnabled, setAgentEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(AGENT_ENABLED_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [agentSettings, setAgentSettings] = useState<AgentSettings>({
+    agent_mode: 'plan_confirm_execute',
+    permission_mode: 'per_action',
+    sandbox_root: '',
+    model_profile: 'balanced',
+  });
+  const [currentRun, setCurrentRun] = useState<AgentRun | null>(null);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentError, setAgentError] = useState('');
+  const [lastRollbackRunId, setLastRollbackRunId] = useState('');
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
@@ -197,14 +248,32 @@ export const AgentChatPage = () => {
       localStorage.setItem(VOICE_KEY, voiceName);
       localStorage.setItem(TTS_ENGINE_KEY, ttsEngine);
       localStorage.setItem(CHAT_MODEL_KEY, selectedTextModel);
+      localStorage.setItem(AGENT_ENABLED_KEY, agentEnabled ? '1' : '0');
     } catch {}
-  }, [autoSpeak, voiceName, ttsEngine, selectedTextModel]);
+  }, [autoSpeak, voiceName, ttsEngine, selectedTextModel, agentEnabled]);
 
   useEffect(() => {
     const init = async () => {
       await refreshLocalModelState();
       await fetchFishModels();
       await fetchVoices(ttsEngine);
+      try {
+        const settingsRes = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.AGENT_SETTINGS}`);
+        const settingsData = await settingsRes.json();
+        if (settingsRes.ok && settingsData?.success && settingsData.settings) {
+          const s = settingsData.settings as AgentSettings;
+          setAgentSettings({
+            agent_mode: 'plan_confirm_execute',
+            permission_mode: s.permission_mode === 'session_trust' ? 'session_trust' : 'per_action',
+            sandbox_root: String(s.sandbox_root || ''),
+            model_profile: (['fast', 'balanced', 'max_reasoning'].includes(String(s.model_profile))
+              ? s.model_profile
+              : 'balanced') as AgentSettings['model_profile'],
+          });
+        }
+      } catch {
+        // Keep defaults when agent settings endpoint is unavailable.
+      }
 
       try {
         const historyRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/history/${encodeURIComponent(sessionId)}`);
@@ -578,6 +647,142 @@ export const AgentChatPage = () => {
     }
   };
 
+  const persistAgentSettings = async (partial: Partial<AgentSettings>) => {
+    const next: AgentSettings = {
+      ...agentSettings,
+      ...partial,
+      agent_mode: 'plan_confirm_execute',
+    };
+    setAgentSettings(next);
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.AGENT_SETTINGS}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      const data = await res.json();
+      if (res.ok && data?.success && data.settings) {
+        const s = data.settings as AgentSettings;
+        setAgentSettings({
+          agent_mode: 'plan_confirm_execute',
+          permission_mode: s.permission_mode === 'session_trust' ? 'session_trust' : 'per_action',
+          sandbox_root: String(s.sandbox_root || ''),
+          model_profile: (['fast', 'balanced', 'max_reasoning'].includes(String(s.model_profile))
+            ? s.model_profile
+            : 'balanced') as AgentSettings['model_profile'],
+        });
+      }
+    } catch {
+      // Best-effort persistence.
+    }
+  };
+
+  const runAgentTask = async (text: string) => {
+    const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.AGENT_RUN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sessionId,
+        message: text,
+        auto_execute: agentSettings.permission_mode === 'session_trust',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.success || !data?.run) {
+      throw new Error(data?.detail || data?.error || 'Agent run failed');
+    }
+    const run = data.run as AgentRun;
+    setCurrentRun(run);
+    if (run.rollback_ready) {
+      setLastRollbackRunId(run.run_id);
+    }
+    return run;
+  };
+
+  const approveAgentActions = async (approveAll: boolean, actionIds?: number[]) => {
+    if (!currentRun) return;
+    setAgentBusy(true);
+    setAgentError('');
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.AGENT_APPROVE}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          run_id: currentRun.run_id,
+          approve_all: approveAll,
+          action_ids: approveAll ? undefined : actionIds,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.run) {
+        throw new Error(data?.detail || data?.error || 'Approve failed');
+      }
+      const run = data.run as AgentRun;
+      setCurrentRun(run);
+      if (run.rollback_ready) {
+        setLastRollbackRunId(run.run_id);
+      }
+      if (run.status === 'completed') {
+        setMessages((prev) => [...prev, { role: 'assistant', content: 'Run executed successfully. Review results in the action queue.' }]);
+      } else if (run.status === 'failed') {
+        setMessages((prev) => [...prev, { role: 'assistant', content: 'Run failed. Check action error output and retry.' }]);
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error.message : 'Approve failed';
+      setAgentError(err);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Agent error: ${err}` }]);
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const denyAgentActions = async (actionIds?: number[]) => {
+    if (!currentRun) return;
+    setAgentBusy(true);
+    setAgentError('');
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.AGENT_DENY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_id: currentRun.run_id, action_ids: actionIds }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.run) {
+        throw new Error(data?.detail || data?.error || 'Deny failed');
+      }
+      setCurrentRun(data.run as AgentRun);
+    } catch (error) {
+      const err = error instanceof Error ? error.message : 'Deny failed';
+      setAgentError(err);
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const rollbackLastRun = async () => {
+    if (!lastRollbackRunId) return;
+    setAgentBusy(true);
+    setAgentError('');
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.AGENT_ROLLBACK}/${encodeURIComponent(lastRollbackRunId)}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.detail || data?.error || 'Rollback failed');
+      }
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Rollback completed for the last mutating run.' }]);
+      if (currentRun && currentRun.run_id === lastRollbackRunId) {
+        setCurrentRun({ ...currentRun, status: 'rolled_back' });
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error.message : 'Rollback failed';
+      setAgentError(err);
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
   const sendMessage = async (evt?: FormEvent, overrideText?: string) => {
     evt?.preventDefault();
     const text = (overrideText ?? input).trim();
@@ -593,39 +798,52 @@ export const AgentChatPage = () => {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const res = await fetch(`${BACKEND_API.BASE_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: text,
-          model: selectedTextModel,
-          voice_name: voiceName,
-          speak: autoSpeak,
-          tts_engine: ttsEngine,
-        }),
-      });
+      if (agentEnabled) {
+        const run = await runAgentTask(text);
+        const pendingCount = run.actions.filter((a) => a.status === 'pending_approval').length;
+        const summary = [
+          run.status === 'awaiting_approval' ? 'Plan ready. Approval required.' : `Run status: ${run.status}`,
+          run.plan_text || 'No plan text.',
+          `Risk: ${run.risk_summary || 'n/a'}`,
+          `Pending actions: ${pendingCount}`,
+        ].join('\n');
+        setMessages((prev) => [...prev, { role: 'assistant', content: summary }]);
+      } else {
+        const res = await fetch(`${BACKEND_API.BASE_URL}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sessionId,
+            message: text,
+            model: selectedTextModel,
+            voice_name: voiceName,
+            speak: autoSpeak,
+            tts_engine: ttsEngine,
+          }),
+        });
 
-      const data = await res.json();
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.detail || data?.error || 'Chat request failed');
-      }
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.detail || data?.error || 'Chat request failed');
+        }
 
-      const reply = String(data.response ?? '');
-      const ttsText = String(data.tts_text ?? reply);
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
-      setMemory(String(data.memory ?? ''));
-      setTurnCount(Number(data.turn_count ?? turnCount + 1) || 0);
-      setMemoryRefreshEveryTurns(Number(data.memory_refresh_every_turns ?? memoryRefreshEveryTurns) || DEFAULT_MEMORY_REFRESH_TURNS);
+        const reply = String(data.response ?? '');
+        const ttsText = String(data.tts_text ?? reply);
+        setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+        setMemory(String(data.memory ?? ''));
+        setTurnCount(Number(data.turn_count ?? turnCount + 1) || 0);
+        setMemoryRefreshEveryTurns(Number(data.memory_refresh_every_turns ?? memoryRefreshEveryTurns) || DEFAULT_MEMORY_REFRESH_TURNS);
 
-      if (autoSpeak && typeof data.audio_base64 === 'string' && data.audio_base64) {
-        await playTtsFromBase64(data.audio_base64, String(data.mime_type ?? 'audio/L16;rate=24000'));
-      } else if (autoSpeak) {
-        await playTts(ttsText);
+        if (autoSpeak && typeof data.audio_base64 === 'string' && data.audio_base64) {
+          await playTtsFromBase64(data.audio_base64, String(data.mime_type ?? 'audio/L16;rate=24000'));
+        } else if (autoSpeak) {
+          await playTts(ttsText);
+        }
       }
     } catch (error) {
       const err = error instanceof Error ? error.message : 'Unknown chat error';
       setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err}` }]);
+      setAgentError(err);
     } finally {
       setIsSending(false);
     }
@@ -702,6 +920,8 @@ export const AgentChatPage = () => {
       setMessages([]);
       setMemory('');
       setTurnCount(0);
+      setCurrentRun(null);
+      setAgentError('');
     } catch {
       // Ignore reset failures and keep current state.
     }
@@ -794,6 +1014,17 @@ export const AgentChatPage = () => {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setAgentEnabled((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
+              agentEnabled
+                ? 'border-emerald-400/40 text-emerald-300 bg-emerald-900/20'
+                : 'border-white/10 text-slate-300 bg-white/[0.02]'
+            }`}
+          >
+            {agentEnabled ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldX className="w-3.5 h-3.5" />}
+            {agentEnabled ? 'Agent Mode' : 'Classic Chat'}
+          </button>
+          <button
             onClick={() => setAutoSpeak((v) => !v)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
               autoSpeak ? 'border-emerald-400/40 text-emerald-300 bg-emerald-900/20' : 'border-white/10 text-slate-300 bg-white/[0.02]'
@@ -814,6 +1045,14 @@ export const AgentChatPage = () => {
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Reset
+          </button>
+          <button
+            onClick={() => void rollbackLastRun()}
+            disabled={!lastRollbackRunId || agentBusy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-xs text-slate-300 bg-white/[0.02] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+            Undo Last Run
           </button>
         </div>
       </div>
@@ -969,6 +1208,108 @@ export const AgentChatPage = () => {
               </div>
             </div>
           )}
+
+          <div className="mb-4 rounded-lg border border-cyan-400/20 bg-cyan-500/5 px-3 py-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-cyan-300">Agent Brain</div>
+              <div className="text-[10px] text-slate-300">Mode: {agentEnabled ? 'Plan -> Confirm -> Execute' : 'Classic chat'}</div>
+            </div>
+            <label className="block text-[11px] text-slate-400 mb-1">Permission Mode</label>
+            <select
+              value={agentSettings.permission_mode}
+              onChange={(e) => { void persistAgentSettings({ permission_mode: e.target.value as AgentSettings['permission_mode'] }); }}
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100 mb-2"
+            >
+              <option value="per_action">Per action confirm</option>
+              <option value="session_trust">Session trust</option>
+            </select>
+            <label className="block text-[11px] text-slate-400 mb-1">Model Profile</label>
+            <select
+              value={agentSettings.model_profile}
+              onChange={(e) => { void persistAgentSettings({ model_profile: e.target.value as AgentSettings['model_profile'] }); }}
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100 mb-2"
+            >
+              <option value="fast">Fast</option>
+              <option value="balanced">Balanced</option>
+              <option value="max_reasoning">Max Reasoning</option>
+            </select>
+            <div className="text-[10px] text-slate-400 break-all">
+              Sandbox root: {agentSettings.sandbox_root || 'n/a'}
+            </div>
+          </div>
+
+          <div className="mb-4 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h4 className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Action Queue</h4>
+              <div className="text-[10px] text-slate-500">{currentRun ? `Run ${currentRun.run_id.slice(0, 8)}` : 'No active run'}</div>
+            </div>
+            {currentRun ? (
+              <div className="space-y-2">
+                <div className="text-[11px] text-slate-300">Status: {currentRun.status}</div>
+                <div className="text-[10px] text-slate-400">Risk: {currentRun.risk_summary || 'n/a'}</div>
+                {currentRun.actions.map((action) => (
+                  <div key={action.id} className="rounded border border-white/10 bg-black/30 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[11px] text-slate-200">{action.index + 1}. {action.tool_name}</div>
+                      <div className="text-[10px] text-slate-400">{action.status}</div>
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400 break-words">{action.preview_text || '-'}</div>
+                    {action.error_text && <div className="mt-1 text-[10px] text-red-300">{action.error_text}</div>}
+                    {action.result && Object.keys(action.result).length > 0 && (
+                      <pre className="mt-1 max-h-24 overflow-auto rounded bg-black/40 p-1.5 text-[9px] text-slate-300 whitespace-pre-wrap">
+                        {JSON.stringify(action.result, null, 2)}
+                      </pre>
+                    )}
+                    {action.status === 'pending_approval' && (
+                      <div className="mt-2 flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => { void approveAgentActions(false, [action.id]); }}
+                          disabled={agentBusy}
+                          className="inline-flex items-center gap-1 rounded border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-200 disabled:opacity-50"
+                        >
+                          <Check className="w-3 h-3" />
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { void denyAgentActions([action.id]); }}
+                          disabled={agentBusy}
+                          className="inline-flex items-center gap-1 rounded border border-red-400/40 bg-red-500/10 px-2 py-1 text-[10px] text-red-200 disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" />
+                          Deny
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {currentRun.actions.some((a) => a.status === 'pending_approval') && (
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { void approveAgentActions(true); }}
+                      disabled={agentBusy}
+                      className="rounded border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-200 disabled:opacity-50"
+                    >
+                      Approve All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { void denyAgentActions(); }}
+                      disabled={agentBusy}
+                      className="rounded border border-red-400/40 bg-red-500/10 px-2 py-1 text-[10px] text-red-200 disabled:opacity-50"
+                    >
+                      Deny All
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-[10px] text-slate-500">Send a message in Agent Mode to build a runnable plan.</div>
+            )}
+            {agentError && <div className="mt-2 text-[10px] text-red-300">{agentError}</div>}
+          </div>
 
           <div className="mb-4">
             <div className="text-[11px] text-slate-400 mb-2">Recommended Models</div>
