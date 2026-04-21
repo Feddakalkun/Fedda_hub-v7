@@ -1,12 +1,12 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-title FEDDA AI Studio - One-Click Installer (Lite)
+title FEDDA AI Studio - One-Click Installer
 
 set "REPO_URL=https://github.com/Feddakalkun/Fedda_hub-v7"
 set "REPO_BRANCH=main"
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
-set "INSTALL_DIR=%ROOT%\comfyuifeddafront-lite"
+set "INSTALL_DIR=%ROOT%\comfyuifeddafront"
 set "LOG_DIR=%ROOT%\logs"
 set "LOG_FILE=%LOG_DIR%\oneclick_setup.log"
 
@@ -17,13 +17,13 @@ echo [%date% %time%] FEDDA One-Click installer start >> "%LOG_FILE%"
 
 echo.
 echo  ==============================================================
-echo   FEDDA AI Studio ^| One-Click Installer (LITE)
+echo   FEDDA AI Studio ^| Main Installer
 echo  ==============================================================
 echo.
-echo   This installer intentionally skips FULL mode for stability.
-echo   It installs the tested LITE stack only.
+echo   This installer sets up the recommended production build.
+echo   No extra setup menus, no manual repo steps.
 echo.
-echo   REQUIREMENTS:
+echo   Requirements:
 echo    - Git
 echo    - Node.js 18+
 echo    - npm
@@ -70,7 +70,7 @@ echo [%date% %time%] Tool checks passed >> "%LOG_FILE%"
 
 if exist "%INSTALL_DIR%\.git" (
   echo.
-  echo  [INFO] Existing LITE install detected. Updating repo...
+  echo  [INFO] Existing FEDDA install detected. Updating repo...
   pushd "%INSTALL_DIR%"
 
   for /f "delims=" %%r in ('git remote get-url origin 2^>nul') do set "ORIGIN_URL=%%r"
@@ -142,8 +142,8 @@ if not exist "%INSTALL_DIR%\install.bat" (
 )
 
 echo.
-echo  [INFO] Running LITE installer...
-echo [%date% %time%] Running install.bat LITE >> "%LOG_FILE%"
+echo  [INFO] Running FEDDA installer...
+echo [%date% %time%] Running install.bat stable profile >> "%LOG_FILE%"
 
 pushd "%INSTALL_DIR%"
 call install.bat LITE
@@ -162,14 +162,14 @@ if not "%INSTALL_EXIT%"=="0" (
 
 echo.
 echo  ==============================================================
-echo   FEDDA AI Studio installed successfully (LITE)
+echo   FEDDA AI Studio installed successfully
 echo  ==============================================================
 echo.
 echo   Start app:
 echo    %INSTALL_DIR%\run.bat
 echo.
-echo   Update later:
-echo    %ROOT%\FEDDA_Update-v7.bat
+echo   Update later \(recommended\):
+echo    %ROOT%\\FEDDA_OneClick_Installer-v7.bat
 echo.
 echo [%date% %time%] SUCCESS >> "%LOG_FILE%"
 pause
