@@ -1525,6 +1525,45 @@ async def generate(req: GenerateRequest):
 @app.get("/api/generate/status/{prompt_id}")
 async def get_generation_status(prompt_id: str):
     """Check status of a specific generation job. Returns all output files."""
+    def _extract_boxes(value):
+        boxes = []
+        seen = set()
+
+        def add_box(x1, y1, x2, y2):
+            try:
+                box = [float(x1), float(y1), float(x2), float(y2)]
+            except Exception:
+                return
+            if box[2] <= box[0] or box[3] <= box[1]:
+                return
+            key = tuple(round(v, 4) for v in box)
+            if key in seen:
+                return
+            seen.add(key)
+            boxes.append(box)
+
+        def walk(v):
+            if isinstance(v, dict):
+                # Direct bbox-like objects
+                if all(k in v for k in ("x1", "y1", "x2", "y2")):
+                    add_box(v.get("x1"), v.get("y1"), v.get("x2"), v.get("y2"))
+                if all(k in v for k in ("left", "top", "right", "bottom")):
+                    add_box(v.get("left"), v.get("top"), v.get("right"), v.get("bottom"))
+                for item in v.values():
+                    walk(item)
+                return
+            if isinstance(v, (list, tuple)):
+                if len(v) >= 4:
+                    if all(isinstance(v[i], (int, float)) for i in range(4)):
+                        add_box(v[0], v[1], v[2], v[3])
+                    elif all(isinstance(v[i], str) and str(v[i]).replace(".", "", 1).replace("-", "", 1).isdigit() for i in range(4)):
+                        add_box(float(v[0]), float(v[1]), float(v[2]), float(v[3]))
+                for item in v:
+                    walk(item)
+
+        walk(value)
+        return boxes
+
     try:
         # Check history first
         resp = requests.get(f"{COMFY_URL}/history/{prompt_id}", timeout=2)
@@ -1536,6 +1575,7 @@ async def get_generation_status(prompt_id: str):
                 images = []
                 videos = []
                 audios = []
+                detected_boxes = []
                 for node_id, output in outputs.items():
                     # Still images
                     for img in output.get("images", []):
@@ -1571,7 +1611,20 @@ async def get_generation_status(prompt_id: str):
                             "subfolder": aud.get("subfolder", ""),
                             "type": aud.get("type", "output")
                         })
-                return {"success": True, "status": "completed", "images": images, "videos": videos, "audios": audios}
+                    # Collect potential bbox outputs for pause/select workflows.
+                    try:
+                        detected_boxes.extend(_extract_boxes(output))
+                    except Exception:
+                        pass
+                return {
+                    "success": True,
+                    "status": "completed",
+                    "images": images,
+                    "videos": videos,
+                    "audios": audios,
+                    "detected_boxes": detected_boxes,
+                    "raw_outputs": outputs,
+                }
 
         # Check queue
         q_resp = requests.get(f"{COMFY_URL}/queue", timeout=2)

@@ -230,12 +230,17 @@ class WorkflowService:
 
                 if is_api:
                     # API Format Injection
-                    input_key = input_info.get("input_key") or param_key
+                    input_keys = input_info.get("input_keys")
+                    if isinstance(input_keys, list) and input_keys:
+                        target_input_keys = [str(k) for k in input_keys if str(k).strip()]
+                    else:
+                        target_input_keys = [input_info.get("input_key") or param_key]
                     for node_id in target_node_ids:
                         if node_id in workflow:
                             if "inputs" not in workflow[node_id]:
                                 workflow[node_id]["inputs"] = {}
-                            workflow[node_id]["inputs"][input_key] = param_value
+                            for input_key in target_input_keys:
+                                workflow[node_id]["inputs"][input_key] = param_value
                         else:
                             print(f"    [WARN] Node {node_id} NOT FOUND in workflow!")
                 else:

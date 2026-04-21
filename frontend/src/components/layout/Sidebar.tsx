@@ -54,6 +54,7 @@ const SECTIONS: NavSection[] = [
             label: 'Z-Image',
             subitems: [
               { id: 'z-image-txt2img', label: 'Txt2Img' },
+              { id: 'z-image-dual-lora', label: 'Dual LoRA' },
             ],
           },
           {
@@ -72,11 +73,7 @@ const SECTIONS: NavSection[] = [
               { id: 'qwen-multi-angle', label: 'Multi Angles' },
             ],
           },
-          {
-            id: 'image-other',
-            label: 'Other',
-            subitems: [{ id: 'image-influencer', label: 'Influencer' }],
-          },
+          { id: 'image-other', label: 'Other' }
         ]
       },
       {
@@ -84,9 +81,9 @@ const SECTIONS: NavSection[] = [
         label: 'Video Studio',
         icon: Video,
         subitems: [
-          { id: 'wan21-steady-dancer', label: 'WAN 2.1 — Steady Dancer' },
           { id: 'wan22-vid2vid', label: 'WAN 2.2 — Vid2Vid' },
           { id: 'wan22-img2vid', label: 'WAN 2.2 — Img2Vid' },
+          { id: 'wan22-img2vid-6frames', label: 'WAN 2.2 — Story (6 Frames)' },
           { id: 'ltx-flf',       label: 'LTX — First/Last Frame' },
           { id: 'ltx-img-audio', label: 'LTX — Img + Audio Lipsync' },
         ]

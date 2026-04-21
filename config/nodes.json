@@ -222,6 +222,18 @@
     "note": "Qwen multi-angle nodes for character angle consistency workflows"
   },
   {
+    "name": "ComfyUI-Florence2",
+    "url": "https://github.com/kijai/ComfyUI-Florence2.git",
+    "folder": "ComfyUI-Florence2",
+    "note": "Florence2 grounding nodes: DownloadAndLoadFlorence2Model, Florence2Run"
+  },
+  {
+    "name": "ComfyUI-segment-anything-2",
+    "url": "https://github.com/kijai/ComfyUI-segment-anything-2.git",
+    "folder": "ComfyUI-segment-anything-2",
+    "note": "SAM2 segmentation nodes: DownloadAndLoadSAM2Model, Sam2Segmentation, Florence2toCoordinates"
+  },
+  {
     "name": "ComfyUI-Qwen-TTS",
     "url": "https://github.com/flybirdxx/ComfyUI-Qwen-TTS.git",
     "folder": "ComfyUI-Qwen-TTS",

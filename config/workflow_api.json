@@ -59,6 +59,176 @@
       }
     }
   },
+  "z-image-dual-base": {
+    "name": "Z-Image Dual LoRA (Base + Detect)",
+    "filename": "z-image/z-image-dual-lora-base.json",
+    "description": "Stage 1: dual-person base generation with detection outputs for person selection.",
+    "inputs": {
+      "main_prompt": {
+        "node_id": "8",
+        "input_key": "text",
+        "type": "string",
+        "label": "Main Prompt"
+      },
+      "detail_prompt": {
+        "node_id": "9",
+        "input_key": "text",
+        "type": "string",
+        "label": "Detail Prompt"
+      },
+      "negative": {
+        "node_id": "10",
+        "input_key": "text",
+        "type": "string",
+        "label": "Negative Prompt"
+      },
+      "seed": {
+        "node_id": "15",
+        "input_key": "seed",
+        "type": "number",
+        "label": "Seed"
+      },
+      "detection_phrase": {
+        "node_id": "18",
+        "input_key": "text_input",
+        "type": "string",
+        "label": "Detection Phrase"
+      },
+      "selected_box_index": {
+        "node_id": "19",
+        "input_key": "index",
+        "type": "number",
+        "label": "Selected Box Index"
+      },
+      "unet_name": {
+        "node_id": "1",
+        "input_key": "unet_name",
+        "type": "string",
+        "label": "UNET"
+      },
+      "clip_name": {
+        "node_id": "2",
+        "input_key": "clip_name",
+        "type": "string",
+        "label": "CLIP"
+      },
+      "vae_name": {
+        "node_id": "3",
+        "input_key": "vae_name",
+        "type": "string",
+        "label": "VAE"
+      },
+      "lora_main_name": {
+        "node_id": "4",
+        "input_key": "lora_name",
+        "type": "string",
+        "label": "Main LoRA"
+      },
+      "lora_main_strength": {
+        "node_id": "4",
+        "input_keys": ["strength_model", "strength_clip"],
+        "type": "number",
+        "label": "Main LoRA Strength"
+      },
+      "lora_detail_name": {
+        "node_id": "5",
+        "input_key": "lora_name",
+        "type": "string",
+        "label": "Detail LoRA"
+      },
+      "lora_detail_strength": {
+        "node_id": "5",
+        "input_keys": ["strength_model", "strength_clip"],
+        "type": "number",
+        "label": "Detail LoRA Strength"
+      }
+    }
+  },
+  "z-image-dual-detail": {
+    "name": "Z-Image Dual LoRA (Detail Pass)",
+    "filename": "z-image/z-image-dual-lora-detail.json",
+    "description": "Stage 2: selected-person inpaint/detail pass using locked seed and LoRA #2.",
+    "inputs": {
+      "main_prompt": {
+        "node_id": "8",
+        "input_key": "text",
+        "type": "string",
+        "label": "Main Prompt"
+      },
+      "detail_prompt": {
+        "node_id": "9",
+        "input_key": "text",
+        "type": "string",
+        "label": "Detail Prompt"
+      },
+      "negative": {
+        "node_id": "10",
+        "input_key": "text",
+        "type": "string",
+        "label": "Negative Prompt"
+      },
+      "seed": {
+        "node_ids": ["15", "25"],
+        "input_key": "seed",
+        "type": "number",
+        "label": "Seed"
+      },
+      "detection_phrase": {
+        "node_id": "18",
+        "input_key": "text_input",
+        "type": "string",
+        "label": "Detection Phrase"
+      },
+      "selected_box_index": {
+        "node_id": "19",
+        "input_key": "index",
+        "type": "number",
+        "label": "Selected Box Index"
+      },
+      "unet_name": {
+        "node_id": "1",
+        "input_key": "unet_name",
+        "type": "string",
+        "label": "UNET"
+      },
+      "clip_name": {
+        "node_id": "2",
+        "input_key": "clip_name",
+        "type": "string",
+        "label": "CLIP"
+      },
+      "vae_name": {
+        "node_id": "3",
+        "input_key": "vae_name",
+        "type": "string",
+        "label": "VAE"
+      },
+      "lora_main_name": {
+        "node_id": "4",
+        "input_key": "lora_name",
+        "type": "string",
+        "label": "Main LoRA"
+      },
+      "lora_main_strength": {
+        "node_id": "4",
+        "input_keys": ["strength_model", "strength_clip"],
+        "type": "number",
+        "label": "Main LoRA Strength"
+      },
+      "lora_detail_name": {
+        "node_id": "5",
+        "input_key": "lora_name",
+        "type": "string",
+        "label": "Detail LoRA"
+      },
+      "lora_detail_strength": {
+        "node_id": "5",
+        "input_keys": ["strength_model", "strength_clip"],
+        "type": "number",
+        "label": "Detail LoRA Strength"
+      }
+    }
+  },
   "qwen-edit-2512": {
     "name": "Qwen Edit 2512 (Txt2Img)",
     "filename": "qwen/qwen-edit-2512.json",
@@ -267,31 +437,13 @@
         "input_key": "seed",
         "type": "seed_sequence",
         "label": "Seed"
-      },
-      "character_lock_text": {
-        "input_key": "prompt",
-        "type": "string",
-        "node_ids": [
-          "197:109",
-          "213:272",
-          "221:281",
-          "229:290",
-          "237:299",
-          "245:308"
-        ],
-        "label": "Character Lock Text"
-      },
-      "loras": {
-        "type": "loras",
-        "node_id": "111",
-        "label": "LoRAs"
       }
     }
   },
   "wan22-vid2vid": {
     "name": "WAN 2.2 Vid2Vid",
     "filename": "wan22/vid2vid-4frames-wan22.json",
-    "description": "Extend and transform video with WAN 2.2 — 4-frame expansion chain",
+    "description": "Extend and transform video with WAN 2.2 \u2014 4-frame expansion chain",
     "inputs": {
       "video": {
         "node_id": "148",
@@ -402,101 +554,10 @@
       }
     }
   },
-  "wan21-steady-dancer": {
-    "name": "WAN 2.1 Steady Dancer",
-    "filename": "wan21/WAN-21-STEADY-DANCER.json",
-    "description": "Transfer motion from a reference dance video to a selected subject image.",
-    "inputs": {
-      "reference_video": {
-        "node_id": "75",
-        "input_key": "video",
-        "type": "string",
-        "label": "Reference Motion Video"
-      },
-      "image": {
-        "node_id": "76",
-        "input_key": "image",
-        "type": "string",
-        "label": "Subject Image"
-      },
-      "prompt": {
-        "node_id": "145",
-        "input_key": "string",
-        "type": "string",
-        "label": "Prompt"
-      },
-      "width": {
-        "node_id": "143",
-        "input_key": "Number",
-        "type": "number",
-        "label": "Width"
-      },
-      "height": {
-        "node_id": "144",
-        "input_key": "Number",
-        "type": "number",
-        "label": "Height"
-      },
-      "video_length_seconds": {
-        "node_id": "147",
-        "input_key": "Number",
-        "type": "number",
-        "label": "Video Length (seconds)"
-      },
-      "fps": {
-        "node_id": "137",
-        "input_key": "Number",
-        "type": "number",
-        "label": "FPS"
-      },
-      "seed": {
-        "node_id": "119",
-        "input_key": "seed",
-        "type": "number",
-        "label": "Seed"
-      },
-      "steps": {
-        "node_id": "119",
-        "input_key": "steps",
-        "type": "number",
-        "label": "Steps"
-      },
-      "cfg": {
-        "node_id": "119",
-        "input_key": "cfg",
-        "type": "number",
-        "label": "CFG"
-      },
-      "pose_strength_spatial": {
-        "node_id": "71",
-        "input_key": "pose_strength_spatial",
-        "type": "number",
-        "label": "Pose Strength Spatial"
-      },
-      "pose_strength_temporal": {
-        "node_id": "71",
-        "input_key": "pose_strength_temporal",
-        "type": "number",
-        "label": "Pose Strength Temporal"
-      },
-      "lora_name": {
-        "node_id": "69",
-        "input_key": "lora",
-        "type": "string",
-        "label": "LoRA Name"
-      },
-      "lora_strength": {
-        "node_id": "69",
-        "input_key": "strength",
-        "type": "number",
-        "label": "LoRA Strength"
-      }
-    }
-  },
   "wan22-img2vid": {
     "name": "WAN 2.2 Img2Vid",
     "filename": "wan22/img2vid-4frames-wan22.json",
-    "description": "Animate a still image into video with WAN 2.2 — 4-frame expansion chain",
+    "description": "Animate a still image into video with WAN 2.2 \u2014 4-frame expansion chain",
     "inputs": {
       "image": {
         "node_id": "25",
@@ -553,7 +614,7 @@
     }
   },
   "ltx-flf": {
-    "name": "LTX 2.3 — First/Last Frame",
+    "name": "LTX 2.3 \u2014 First/Last Frame",
     "filename": "ltx/LTX-23-flf.json",
     "description": "Generate video from first and last frame images using LTX Video 2.3",
     "inputs": {
@@ -620,7 +681,7 @@
     }
   },
   "ltx-img-audio": {
-    "name": "LTX 2.3 — Img + Audio Lipsync",
+    "name": "LTX 2.3 \u2014 Img + Audio Lipsync",
     "filename": "ltx/LTX-23-imgaudio2video.json",
     "description": "Generate lipsync video from a reference image and audio file using LTX Video 2.3",
     "inputs": {
@@ -905,271 +966,5 @@
         "label": "NSFW"
       }
     }
-  },
-  "influencer-expression": {
-    "inputs": {
-      "eyebrow": {
-        "type": "number",
-        "node_id": "12",
-        "input_key": "value",
-        "label": "Eyebrow"
-      },
-      "aaa": {
-        "type": "number",
-        "node_id": "16",
-        "input_key": "value",
-        "label": "Mouth AAA"
-      },
-      "woo": {
-        "type": "number",
-        "node_id": "18",
-        "input_key": "value",
-        "label": "Mouth WOO"
-      },
-      "image": {
-        "type": "string",
-        "node_id": "1",
-        "input_key": "image",
-        "label": "Source Image"
-      },
-      "pupil_x": {
-        "type": "number",
-        "node_id": "14",
-        "input_key": "value",
-        "label": "Pupil X"
-      },
-      "rotate_pitch": {
-        "type": "number",
-        "node_id": "9",
-        "input_key": "value",
-        "label": "Rotate Pitch"
-      },
-      "wink": {
-        "type": "number",
-        "node_id": "13",
-        "input_key": "value",
-        "label": "Wink"
-      },
-      "blink": {
-        "type": "number",
-        "node_id": "6",
-        "input_key": "value",
-        "label": "Blink"
-      },
-      "rotate_yaw": {
-        "type": "number",
-        "node_id": "20",
-        "input_key": "value",
-        "label": "Rotate Yaw"
-      },
-      "eee": {
-        "type": "number",
-        "node_id": "17",
-        "input_key": "value",
-        "label": "Mouth EEE"
-      },
-      "smile": {
-        "type": "number",
-        "node_id": "19",
-        "input_key": "value",
-        "label": "Smile"
-      },
-      "pupil_y": {
-        "type": "number",
-        "node_id": "15",
-        "input_key": "value",
-        "label": "Pupil Y"
-      },
-      "rotate_roll": {
-        "type": "number",
-        "node_id": "11",
-        "input_key": "value",
-        "label": "Rotate Roll"
-      }
-    },
-    "description": "Expression editing with identity-locked source image.",
-    "name": "Influencer Expression",
-    "filename": "Influencer/EXPRESSION.json"
-  },
-  "influencer-automask": {
-    "inputs": {
-      "mask_accessories": {
-        "type": "boolean",
-        "node_id": "82",
-        "input_key": "accessories",
-        "label": "Mask Accessories"
-      },
-      "mask_background": {
-        "type": "boolean",
-        "node_id": "82",
-        "input_key": "background",
-        "label": "Mask Background"
-      },
-      "prompt": {
-        "type": "string",
-        "node_id": "109",
-        "input_key": "string",
-        "label": "Replacement Prompt"
-      },
-      "image": {
-        "type": "string",
-        "node_id": "108",
-        "input_key": "image",
-        "label": "Source Image"
-      },
-      "mask_body": {
-        "type": "boolean",
-        "node_id": "82",
-        "input_key": "body",
-        "label": "Mask Body"
-      },
-      "mask_hair": {
-        "type": "boolean",
-        "node_id": "82",
-        "input_key": "hair",
-        "label": "Mask Hair"
-      },
-      "seed": {
-        "type": "number",
-        "node_id": "110",
-        "input_key": "seed",
-        "label": "Seed"
-      },
-      "loras": {
-        "type": "loras",
-        "node_id": "111",
-        "label": "LoRAs"
-      },
-      "mask_face": {
-        "type": "boolean",
-        "node_id": "82",
-        "input_key": "face",
-        "label": "Mask Face"
-      },
-      "mask_clothes": {
-        "type": "boolean",
-        "node_id": "82",
-        "input_key": "clothes",
-        "label": "Mask Clothes"
-      }
-    },
-    "description": "Auto-mask + inpaint with text-controlled replacement.",
-    "name": "Influencer WAN2.2 AutoMask",
-    "filename": "Influencer/wan22-automask.json"
-  },
-  "influencer-characterv3": {
-    "inputs": {
-      "pose_13": {
-        "type": "string",
-        "node_id": "53",
-        "input_key": "image",
-        "label": "Pose Ref 13"
-      },
-      "seed": {
-        "type": "number",
-        "node_id": "28",
-        "input_key": "seed",
-        "label": "Seed"
-      },
-      "pose_12": {
-        "type": "string",
-        "node_id": "52",
-        "input_key": "image",
-        "label": "Pose Ref 12"
-      },
-      "pose_6": {
-        "type": "string",
-        "node_id": "46",
-        "input_key": "image",
-        "label": "Pose Ref 6"
-      },
-      "pose_11": {
-        "type": "string",
-        "node_id": "51",
-        "input_key": "image",
-        "label": "Pose Ref 11"
-      },
-      "pose_15": {
-        "type": "string",
-        "node_id": "55",
-        "input_key": "image",
-        "label": "Pose Ref 15"
-      },
-      "pose_5": {
-        "type": "string",
-        "node_id": "45",
-        "input_key": "image",
-        "label": "Pose Ref 5"
-      },
-      "image": {
-        "type": "string",
-        "node_id": "3",
-        "input_key": "image",
-        "label": "Subject Image"
-      },
-      "pose_3": {
-        "type": "string",
-        "node_id": "43",
-        "input_key": "image",
-        "label": "Pose Ref 3"
-      },
-      "pose_10": {
-        "type": "string",
-        "node_id": "50",
-        "input_key": "image",
-        "label": "Pose Ref 10"
-      },
-      "pose_7": {
-        "type": "string",
-        "node_id": "47",
-        "input_key": "image",
-        "label": "Pose Ref 7"
-      },
-      "pose_9": {
-        "type": "string",
-        "node_id": "49",
-        "input_key": "image",
-        "label": "Pose Ref 9"
-      },
-      "pose_8": {
-        "type": "string",
-        "node_id": "48",
-        "input_key": "image",
-        "label": "Pose Ref 8"
-      },
-      "pose_1": {
-        "type": "string",
-        "node_id": "29",
-        "input_key": "image",
-        "label": "Pose Ref 1"
-      },
-      "pose_14": {
-        "type": "string",
-        "node_id": "54",
-        "input_key": "image",
-        "label": "Pose Ref 14"
-      },
-      "pose_4": {
-        "type": "string",
-        "node_id": "44",
-        "input_key": "image",
-        "label": "Pose Ref 4"
-      },
-      "pose_2": {
-        "type": "string",
-        "node_id": "36",
-        "input_key": "image",
-        "label": "Pose Ref 2"
-      },
-      "prompt": {
-        "type": "string",
-        "node_id": "66",
-        "input_key": "text",
-        "label": "Positive Prompt"
-      }
-    },
-    "description": "One subject + up to 15 reference poses for identity-consistent variants.",
-    "name": "Influencer Character v3",
-    "filename": "Influencer/CHARACTERV3.json"
   }
 }
