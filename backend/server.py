@@ -1427,6 +1427,27 @@ class GenerateRequest(BaseModel):
     workflow_id: str
     params: Dict[str, Any]
 
+
+def _zimage_required_models(workflow_id: str, params: Dict[str, Any]) -> List[str]:
+    """
+    Resolve which Z-Image core models must exist before prompt validation.
+    """
+    zimage_ids = {"z-image", "z-image-dual-base", "z-image-dual-detail"}
+    if workflow_id not in zimage_ids:
+        return []
+
+    defaults = {
+        "unet_name": "z_image_turbo_bf16.safetensors",
+        "clip_name": "qwen_3_4b.safetensors",
+        "vae_name": "z-image-vae.safetensors",
+    }
+    names = [
+        str((params or {}).get("unet_name") or defaults["unet_name"]).strip(),
+        str((params or {}).get("clip_name") or defaults["clip_name"]).strip(),
+        str((params or {}).get("vae_name") or defaults["vae_name"]).strip(),
+    ]
+    return [n for n in names if n]
+
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     """Upload a video or image to ComfyUI's input directory."""
@@ -1493,6 +1514,20 @@ async def generate(req: GenerateRequest):
     Loads workflow, injects params, and sends to ComfyUI.
     """
     try:
+        required_models = _zimage_required_models(req.workflow_id, req.params)
+        if required_models:
+            preflight = model_downloader.ensure_zimage_core_models(required_models)
+            if not preflight.get("ready", False):
+                missing = [
+                    f for f in preflight.get("files", [])
+                    if f.get("status") != "completed" or not f.get("exists")
+                ]
+                names = ", ".join(str(f.get("filename")) for f in missing)
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Auto-downloading required Z-Image model(s): {names}. Please retry when download completes.",
+                )
+
         # 1. Prepare ComfyUI API payload
         payload = workflow_service.prepare_payload(req.workflow_id, req.params)
         if not payload:
@@ -1651,6 +1686,14 @@ async def sync_models(repo: str, subfolder: str = "custom"):
 @app.get("/api/models/status/{filename}")
 async def get_download_status(filename: str):
     return model_downloader.get_progress(filename)
+
+
+@app.post("/api/models/zimage-core/ensure")
+async def ensure_zimage_core_models(payload: Optional[Dict[str, Any]] = None):
+    model_names = []
+    if payload and isinstance(payload.get("models"), list):
+        model_names = [str(x).strip() for x in payload.get("models", []) if str(x).strip()]
+    return model_downloader.ensure_zimage_core_models(model_names or None)
 
 
 # ─────────────────────────────────────────────
