@@ -99,7 +99,7 @@ export const Wan21SteadyDancerPage = () => {
   const sessionRef = useRef<string[]>([]);
 
   const { toast } = useToast();
-  const { state: execState, lastOutputVideos, outputReadyCount, registerNodeMap } = useComfyExecution();
+  const { state: execState, error: execError, lastOutputVideos, outputReadyCount, registerNodeMap } = useComfyExecution();
 
   const subjectPreview = subjectImageFile ? `/comfy/view?filename=${encodeURIComponent(subjectImageFile)}&type=input` : null;
   const motionPreview = motionVideoFile ? `/comfy/view?filename=${encodeURIComponent(motionVideoFile)}&type=input` : null;
@@ -154,6 +154,17 @@ export const Wan21SteadyDancerPage = () => {
   useEffect(() => {
     if (!pendingPromptId) return;
     if (execState === 'error') {
+      const msg = String(execError?.message || '').toLowerCase();
+      if (msg.includes('no bones found')) {
+        toast(
+          'No bones found: use a motion video with one clearly visible full body (head + arms + legs in frame), and avoid tiny/far-away subjects.',
+          'error',
+        );
+      } else if (execError?.message) {
+        toast(execError.message, 'error');
+      } else {
+        toast('SteadyDancer failed during pose detection.', 'error');
+      }
       setIsGenerating(false);
       setPendingPromptId(null);
       return;
@@ -166,6 +177,9 @@ export const Wan21SteadyDancerPage = () => {
 
   const handleGenerate = async () => {
     if (!subjectImageFile || !motionVideoFile || !prompt.trim() || isGenerating) return;
+    if (height <= width) {
+      toast('Tip: portrait output (e.g. 512x864) usually improves body pose tracking.', 'info');
+    }
     sessionRef.current = [];
     prevCountRef.current = lastOutputVideos?.length ?? 0;
     setCurrentVideo(null);
@@ -224,6 +238,9 @@ export const Wan21SteadyDancerPage = () => {
 
           <div className="space-y-2">
             <FeddaSectionTitle className="text-white/20">Inputs</FeddaSectionTitle>
+            <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/90">
+              Best result: reference video should contain one full body dancer in frame. If pose fails (`no bones found`), try a closer/clearer motion clip or portrait framing.
+            </div>
             <div className="grid gap-3 lg:grid-cols-2">
               <UploadCard
                 label="Subject Image"

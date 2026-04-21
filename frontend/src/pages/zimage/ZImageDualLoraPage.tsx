@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Sparkles, RefreshCw, Lock, Unlock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { BACKEND_API } from '../../config/api';
 import { comfyService } from '../../services/comfyService';
@@ -13,6 +13,7 @@ type DualBox = {
   x2: number;
   y2: number;
 };
+type DragPoint = { x: number; y: number };
 
 type TraitSet = {
   archetype: string;
@@ -156,9 +157,36 @@ export const ZImageDualLoraPage = () => {
   const [runningBase, setRunningBase] = useState(false);
   const [runningDetail, setRunningDetail] = useState(false);
   const [availableLoras, setAvailableLoras] = useState<string[]>([]);
+  const [showNoBoxModal, setShowNoBoxModal] = useState(false);
+  const [manualMarkMode, setManualMarkMode] = useState(false);
+  const [dragStart, setDragStart] = useState<DragPoint | null>(null);
+  const [dragCurrent, setDragCurrent] = useState<DragPoint | null>(null);
 
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
+
+  const eventToNaturalPoint = (e: ReactMouseEvent): DragPoint | null => {
+    const img = imageRef.current;
+    if (!img) return null;
+    const rect = img.getBoundingClientRect();
+    if (!rect.width || !rect.height || naturalSize.w <= 1 || naturalSize.h <= 1) return null;
+    const rx = Math.min(Math.max(e.clientX - rect.left, 0), rect.width);
+    const ry = Math.min(Math.max(e.clientY - rect.top, 0), rect.height);
+    return {
+      x: (rx / rect.width) * naturalSize.w,
+      y: (ry / rect.height) * naturalSize.h,
+    };
+  };
+
+  const buildFallbackBoxes = (w: number, h: number, phrase: string): DualBox[] => {
+    const left: DualBox = { x1: w * 0.06, y1: h * 0.1, x2: w * 0.48, y2: h * 0.95 };
+    const right: DualBox = { x1: w * 0.52, y1: h * 0.1, x2: w * 0.94, y2: h * 0.95 };
+    const center: DualBox = { x1: w * 0.2, y1: h * 0.08, x2: w * 0.8, y2: h * 0.96 };
+    const p = phrase.toLowerCase();
+    if (p.includes('left')) return [left, right];
+    if (p.includes('right')) return [right, left];
+    return [left, right, center];
+  };
 
   useEffect(() => {
     comfyService.getLoras().then((all) => {
@@ -220,6 +248,10 @@ export const ZImageDualLoraPage = () => {
     setSeedLocked(true);
     setSelectedBoxIndex(-1);
     setDetectedBoxes([]);
+    setShowNoBoxModal(false);
+    setManualMarkMode(false);
+    setDragStart(null);
+    setDragCurrent(null);
 
     setRunningBase(true);
     try {
@@ -231,7 +263,7 @@ export const ZImageDualLoraPage = () => {
           negative: negativePrompt,
           detection_phrase: detectionPhrase,
           seed,
-          selected_box_index: 0,
+          selected_box_index: '0',
           lora_main_name: loraMainName,
           lora_main_strength: Number(loraMainStrength),
           lora_detail_name: loraDetailName,
@@ -267,8 +299,10 @@ export const ZImageDualLoraPage = () => {
 
       setCurrentStep('select');
       if (allBoxes.length === 0) {
-        toast('No boxes found. Try another detection phrase or regenerate base.', 'info');
+        setShowNoBoxModal(true);
+        toast('No boxes found. Choose auto-mark or manual mark.', 'info');
       } else {
+        setShowNoBoxModal(false);
         toast(`Found ${allBoxes.length} candidate box(es). Pick one to continue.`, 'success');
       }
     } catch (err: any) {
@@ -299,7 +333,7 @@ export const ZImageDualLoraPage = () => {
           negative: negativePrompt,
           detection_phrase: detectionPhrase,
           seed,
-          selected_box_index: selectedBoxIndex,
+          selected_box_index: String(selectedBoxIndex),
           lora_main_name: loraMainName,
           lora_main_strength: Number(loraMainStrength),
           lora_detail_name: loraDetailName,
@@ -327,6 +361,8 @@ export const ZImageDualLoraPage = () => {
       const finalUrl = comfyService.getImageUrl(finalImg);
       setFinalImageUrl(finalUrl);
       setCurrentStep('review');
+      setShowNoBoxModal(false);
+      setManualMarkMode(false);
       toast('Dual LoRA detail pass complete.', 'success');
     } catch (err: any) {
       toast(err.message || 'Detail stage failed', 'error');
@@ -336,6 +372,12 @@ export const ZImageDualLoraPage = () => {
   };
 
   const stepIndex = STEPS.findIndex((s) => s.id === currentStep);
+  const draftBox = dragStart && dragCurrent ? {
+    x1: Math.min(dragStart.x, dragCurrent.x),
+    y1: Math.min(dragStart.y, dragCurrent.y),
+    x2: Math.max(dragStart.x, dragCurrent.x),
+    y2: Math.max(dragStart.y, dragCurrent.y),
+  } : null;
 
   return (
     <div className="h-full overflow-y-auto bg-[#07070b] text-white custom-scrollbar">
@@ -493,6 +535,52 @@ export const ZImageDualLoraPage = () => {
                       setNaturalSize({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 });
                     }}
                   />
+                  {manualMarkMode && (
+                    <div
+                      className="absolute inset-0 cursor-crosshair"
+                      onMouseDown={(e) => {
+                        const p = eventToNaturalPoint(e);
+                        if (!p) return;
+                        setDragStart(p);
+                        setDragCurrent(p);
+                      }}
+                      onMouseMove={(e) => {
+                        if (!dragStart) return;
+                        const p = eventToNaturalPoint(e);
+                        if (!p) return;
+                        setDragCurrent(p);
+                      }}
+                      onMouseUp={(e) => {
+                        if (!dragStart) return;
+                        const p = eventToNaturalPoint(e);
+                        if (!p) {
+                          setDragStart(null);
+                          setDragCurrent(null);
+                          return;
+                        }
+                        const box: DualBox = {
+                          x1: Math.min(dragStart.x, p.x),
+                          y1: Math.min(dragStart.y, p.y),
+                          x2: Math.max(dragStart.x, p.x),
+                          y2: Math.max(dragStart.y, p.y),
+                        };
+                        const minSize = Math.max(naturalSize.w, naturalSize.h) * 0.03;
+                        if ((box.x2 - box.x1) < minSize || (box.y2 - box.y1) < minSize) {
+                          toast('Manual box too small. Draw a larger area.', 'error');
+                          setDragStart(null);
+                          setDragCurrent(null);
+                          return;
+                        }
+                        setDetectedBoxes([box]);
+                        setSelectedBoxIndex(0);
+                        setShowNoBoxModal(false);
+                        setManualMarkMode(false);
+                        setDragStart(null);
+                        setDragCurrent(null);
+                        toast('Manual box selected. Continue detail pass.', 'success');
+                      }}
+                    />
+                  )}
                   {detectedBoxes.map((box, idx) => {
                     const left = `${(box.x1 / naturalSize.w) * 100}%`;
                     const top = `${(box.y1 / naturalSize.h) * 100}%`;
@@ -509,6 +597,17 @@ export const ZImageDualLoraPage = () => {
                       />
                     );
                   })}
+                  {draftBox && (
+                    <div
+                      className="absolute border-2 border-amber-300 bg-amber-300/20 rounded-sm pointer-events-none"
+                      style={{
+                        left: `${(draftBox.x1 / naturalSize.w) * 100}%`,
+                        top: `${(draftBox.y1 / naturalSize.h) * 100}%`,
+                        width: `${((draftBox.x2 - draftBox.x1) / naturalSize.w) * 100}%`,
+                        height: `${((draftBox.y2 - draftBox.y1) / naturalSize.h) * 100}%`,
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="mt-2 text-xs text-white/70">Detected boxes: {detectedBoxes.length} {selectedBoxIndex >= 0 ? `| Selected: #${selectedBoxIndex + 1}` : ''}</div>
               </div>
@@ -519,6 +618,18 @@ export const ZImageDualLoraPage = () => {
             <div className="flex flex-wrap gap-2">
               <button onClick={runBaseStage} disabled={runningBase} className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 text-xs disabled:opacity-50">
                 {runningBase ? 'Running...' : 'Regenerate Base'}
+              </button>
+              <button
+                onClick={() => {
+                  if (!baseImageUrl) return;
+                  setManualMarkMode((v) => !v);
+                  setShowNoBoxModal(false);
+                  setDragStart(null);
+                  setDragCurrent(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-xs ${manualMarkMode ? 'border-amber-300/60 bg-amber-300/20 text-amber-100' : 'border-white/15 bg-white/5 text-white/80'}`}
+              >
+                {manualMarkMode ? 'Cancel Manual Mark' : 'Manual Mark'}
               </button>
               {DETECTION_PRESETS.map((preset) => (
                 <button key={preset} onClick={() => setDetectionPhrase(preset)} className="px-2 py-1 rounded border border-white/15 bg-white/5 text-[11px] text-white/75">
@@ -559,6 +670,56 @@ export const ZImageDualLoraPage = () => {
                   <a href={finalImageUrl} download className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-semibold">Download</a>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {showNoBoxModal && currentStep === 'select' && (
+          <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-[2px] flex items-center justify-center px-4">
+            <div className="w-full max-w-xl rounded-2xl border border-cyan-300/30 bg-[#0b1220] p-5 shadow-2xl">
+              <div className="text-cyan-100 text-sm font-bold tracking-wide">No Detection Boxes Found</div>
+              <p className="mt-2 text-sm text-white/75">
+                No person boxes were detected in this frame. Pick one of these recovery options:
+              </p>
+              <div className="mt-4 grid gap-2">
+                <button
+                  onClick={() => {
+                    if (naturalSize.w <= 1 || naturalSize.h <= 1) {
+                      toast('Wait for image preview to finish loading, then try again.', 'info');
+                      return;
+                    }
+                    const fallback = buildFallbackBoxes(naturalSize.w, naturalSize.h, detectionPhrase);
+                    setDetectedBoxes(fallback);
+                    setSelectedBoxIndex(0);
+                    setShowNoBoxModal(false);
+                    setManualMarkMode(false);
+                    toast('Auto-mark applied. Pick or continue.', 'success');
+                  }}
+                  className="w-full rounded-xl border border-emerald-300/40 bg-emerald-500/15 px-4 py-3 text-left"
+                >
+                  <div className="text-emerald-100 text-sm font-semibold">Auto-Mark Smart</div>
+                  <div className="text-emerald-100/70 text-xs mt-0.5">Creates robust candidate boxes without splitting final output.</div>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowNoBoxModal(false);
+                    setManualMarkMode(true);
+                    toast('Draw a box directly on the image.', 'info');
+                  }}
+                  className="w-full rounded-xl border border-amber-300/40 bg-amber-500/15 px-4 py-3 text-left"
+                >
+                  <div className="text-amber-100 text-sm font-semibold">Manual Mark</div>
+                  <div className="text-amber-100/70 text-xs mt-0.5">You draw exactly the target area for detail pass.</div>
+                </button>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setShowNoBoxModal(false)}
+                  className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 text-xs text-white/80"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
