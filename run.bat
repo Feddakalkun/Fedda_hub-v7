@@ -69,7 +69,14 @@ if "%MODE%"=="portable" (
         start "" /B "%~f0" :svc_ollama
         timeout /t 2 /nobreak >nul
     ) else (
-        echo [2/6] Ollama not found - AI chat won't work
+        where ollama >nul 2>nul
+        if not errorlevel 1 (
+            echo [2/6] Starting system Ollama...
+            start "" /B "%~f0" :svc_ollama
+            timeout /t 2 /nobreak >nul
+        ) else (
+            echo [2/6] Ollama not found - AI chat won't work
+        )
     )
 ) else (
     where ollama >nul 2>nul
