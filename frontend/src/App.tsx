@@ -19,8 +19,8 @@ import {
 
 // ─── Tab registry ──────────────────────────────────────────────────────────
 const VALID_TABS = new Set([
-  'chat', 'image', 'z-image', 'z-image-txt2img', 'z-image-dual-lora', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'qwen-multi-angle', 'image-other',
-  'video', 'wan22-vid2vid', 'wan22-img2vid', 'wan22-img2vid-6frames',
+  'chat', 'image', 'z-image', 'z-image-txt2img', 'z-image-dual-lora', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'qwen-multi-angle', 'image-other', 'image-influencer',
+  'video', 'wan21-steady-dancer', 'wan22-vid2vid', 'wan22-img2vid', 'wan22-img2vid-6frames',
   'ltx', 'ltx-flf', 'ltx-img-audio',
   'audio', 'gallery', 'videos', 'library', 'workflows',
   'logs',
@@ -39,7 +39,9 @@ const PAGE_META: Record<string, { label: string; description: string; Icon: any 
   'qwen-image-ref': { label: 'Qwen (Image Reference)', description: 'Generate from a reference image to keep character identity.', Icon: Sparkles },
   'qwen-multi-angle': { label: 'Qwen (Multi Angles)', description: 'Upload one image and generate camera-angle variants.', Icon: Sparkles },
   'image-other': { label: 'Other Workflows', description: 'Uncategorized image processing capabilities.', Icon: Sparkles },
+  'image-influencer': { label: 'Influencer', description: 'Identity-locked creator flow with character lock, expression, automask and multi-angle.', Icon: Sparkles },
   video:          { label: 'Video Studio',   description: 'Create and animate video sequences with WAN.',        Icon: Video           },
+  'wan21-steady-dancer': { label: 'WAN 2.1 Steady Dancer', description: 'Reference-motion transfer for a chosen subject image.', Icon: Video },
   'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.',            Icon: Video           },
   'wan22-img2vid': { label: 'WAN 2.2 Img2Vid', description: 'Animate a still image into video with WAN 2.2.',      Icon: Video           },
   'wan22-img2vid-6frames': { label: 'WAN 2.2 Story (6 Frames)', description: 'Animate a sequence into a full video with WAN 2.2.', Icon: Video },
@@ -104,8 +106,10 @@ function FeddaApp() {
       case 'qwen-image-ref':
       case 'qwen-multi-angle':
       case 'image-other':
+      case 'image-influencer':
         return <ImageStudioPage activeTab={activeTab} />;
       case 'video':
+      case 'wan21-steady-dancer':
       case 'wan22-vid2vid':
       case 'wan22-img2vid':
       case 'wan22-img2vid-6frames':

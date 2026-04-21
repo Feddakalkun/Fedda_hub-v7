@@ -6,6 +6,7 @@ import { QwenTxt2Img } from './qwen/QwenTxt2Img';
 import { QwenImageReferencePage } from './qwen/QwenImageReferencePage';
 import { QwenMultiAnglesPage } from './qwen/QwenMultiAnglesPage';
 import { ZImageDualLoraPage } from './zimage/ZImageDualLoraPage';
+import { InfluencerPage } from './influencer/InfluencerPage';
 
 interface ImageStudioPageProps {
   activeTab?: string;
@@ -40,6 +41,10 @@ export const ImageStudioPage = ({ activeTab = 'z-image' }: ImageStudioPageProps)
 
   if (activeTab === 'image-other') {
     return <PlaceholderPage label="Other Workflows" description="Uncategorized image processing capabilities coming soon." icon={<Sparkles className="w-8 h-8" />} />;
+  }
+
+  if (activeTab === 'image-influencer') {
+    return <InfluencerPage />;
   }
 
   return <ZImageTxt2Img />; // Fallback

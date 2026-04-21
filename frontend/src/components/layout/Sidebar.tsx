@@ -73,7 +73,13 @@ const SECTIONS: NavSection[] = [
               { id: 'qwen-multi-angle', label: 'Multi Angles' },
             ],
           },
-          { id: 'image-other', label: 'Other' }
+          {
+            id: 'image-other',
+            label: 'Other',
+            subitems: [
+              { id: 'image-influencer', label: 'Influencer' },
+            ],
+          },
         ]
       },
       {
@@ -81,6 +87,7 @@ const SECTIONS: NavSection[] = [
         label: 'Video Studio',
         icon: Video,
         subitems: [
+          { id: 'wan21-steady-dancer', label: 'WAN 2.1 — Steady Dancer' },
           { id: 'wan22-vid2vid', label: 'WAN 2.2 — Vid2Vid' },
           { id: 'wan22-img2vid', label: 'WAN 2.2 — Img2Vid' },
           { id: 'wan22-img2vid-6frames', label: 'WAN 2.2 — Story (6 Frames)' },
