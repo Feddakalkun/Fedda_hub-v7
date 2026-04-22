@@ -70,6 +70,20 @@ function labelFromPresetId(id: string, presets: Preset[], fallback: string): str
   return found ? found.label : fallback;
 }
 
+function describeHorizontal(angle: number): string {
+  const normalized = normalizeDegrees(angle);
+  if (Math.abs(normalized) <= 12) return 'front view';
+  if (Math.abs(normalized) >= 168) return 'back view';
+  if (normalized > 0) return `right ${Math.abs(normalized)} deg`;
+  return `left ${Math.abs(normalized)} deg`;
+}
+
+function describeVertical(angle: number): string {
+  if (Math.abs(angle) <= 6) return 'eye-level';
+  if (angle > 0) return `high-angle ${angle} deg`;
+  return `low-angle ${Math.abs(angle)} deg`;
+}
+
 export const QwenMultiAnglesPage = () => {
   const { toast } = useToast();
   const wheelRef = useRef<HTMLDivElement | null>(null);
@@ -106,6 +120,15 @@ export const QwenMultiAnglesPage = () => {
     const zLabel = labelFromPresetId(zPresetId, Z_PRESETS, `z-${zoom.toFixed(1)}`);
     return `<sks> ${hLabel} ${vLabel} ${zLabel}`;
   }, [hPresetId, vPresetId, zPresetId, horizontalAngle, verticalAngle, zoom]);
+
+  const resetCamera = () => {
+    setHorizontalAngle(0);
+    setVerticalAngle(0);
+    setZoom(5);
+    setHPresetId('front');
+    setVPresetId('eye');
+    setZPresetId('medium');
+  };
 
   const updateHorizontalFromPointer = (clientX: number, clientY: number) => {
     const el = wheelRef.current;
@@ -340,6 +363,9 @@ export const QwenMultiAnglesPage = () => {
 
           <div className="rounded-xl border border-fuchsia-500/35 bg-[#0d0b12] p-3">
             <div className="text-[11px] text-fuchsia-300 mb-2 font-mono">{promptText}</div>
+            <div className="mb-2 text-[10px] text-slate-400">
+              Drag controls or use sliders: <span className="text-fuchsia-300">pink = H</span>, <span className="text-cyan-300">cyan = V</span>, <span className="text-amber-300">amber = Z</span>
+            </div>
 
             <div className="grid grid-cols-2 gap-2 mb-2">
               <label className="text-[11px] flex items-center justify-between rounded border border-white/10 px-2 py-1 text-slate-300">
@@ -436,6 +462,11 @@ export const QwenMultiAnglesPage = () => {
                 <line x1={cx} y1={cy - 18} x2={cx + 30} y2={cy - 28} stroke="#fbbf24" strokeWidth="3" />
               </svg>
 
+              <div className="absolute left-1/2 top-[28px] -translate-x-1/2 text-[9px] text-slate-500 select-none">back</div>
+              <div className="absolute left-1/2 bottom-[44px] -translate-x-1/2 text-[9px] text-slate-500 select-none">front</div>
+              <div className="absolute left-[26px] top-1/2 -translate-y-1/2 text-[9px] text-slate-500 select-none">left</div>
+              <div className="absolute right-[26px] top-1/2 -translate-y-1/2 text-[9px] text-slate-500 select-none">right</div>
+
               <div
                 className="absolute w-4 h-4 rounded-full border border-fuchsia-100 bg-fuchsia-500 shadow-[0_0_16px_rgba(236,72,153,0.55)] -translate-x-1/2 -translate-y-1/2"
                 style={{ left: knobX, top: ringKnobY }}
@@ -462,6 +493,69 @@ export const QwenMultiAnglesPage = () => {
               <div className="rounded border border-white/10 bg-black/40 px-2 py-1 text-center text-slate-300">H {horizontalAngle}deg</div>
               <div className="rounded border border-white/10 bg-black/40 px-2 py-1 text-center text-slate-300">V {verticalAngle}deg</div>
               <div className="rounded border border-white/10 bg-black/40 px-2 py-1 text-center text-amber-200">Z {zoom.toFixed(1)}</div>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              <label className="block text-[11px] text-slate-400">
+                Horizontal ({describeHorizontal(horizontalAngle)})
+                <input
+                  type="range"
+                  min={-180}
+                  max={180}
+                  step={1}
+                  value={horizontalAngle}
+                  onChange={(e) => setHorizontalAngle(Number(e.target.value))}
+                  className="mt-1 w-full accent-fuchsia-500"
+                />
+              </label>
+              <label className="block text-[11px] text-slate-400">
+                Vertical ({describeVertical(verticalAngle)})
+                <input
+                  type="range"
+                  min={-60}
+                  max={60}
+                  step={1}
+                  value={verticalAngle}
+                  onChange={(e) => setVerticalAngle(Number(e.target.value))}
+                  className="mt-1 w-full accent-cyan-400"
+                />
+              </label>
+              <label className="block text-[11px] text-slate-400">
+                Zoom ({zoom.toFixed(1)})
+                <input
+                  type="range"
+                  min={1}
+                  max={12}
+                  step={0.1}
+                  value={zoom}
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="mt-1 w-full accent-amber-300"
+                />
+              </label>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setHorizontalAngle(normalizeDegrees(horizontalAngle - 15))}
+                className="rounded border border-white/10 bg-black/40 px-2 py-1 text-[10px] text-slate-300"
+              >
+                H -15
+              </button>
+              <button
+                type="button"
+                onClick={() => setHorizontalAngle(normalizeDegrees(horizontalAngle + 15))}
+                className="rounded border border-white/10 bg-black/40 px-2 py-1 text-[10px] text-slate-300"
+              >
+                H +15
+              </button>
+              <button
+                type="button"
+                onClick={resetCamera}
+                className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-200"
+              >
+                Reset Camera
+              </button>
             </div>
           </div>
 
