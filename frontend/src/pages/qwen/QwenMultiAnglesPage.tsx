@@ -101,8 +101,8 @@ export const QwenMultiAnglesPage = () => {
   const [zPresetId, setZPresetId] = useState('medium');
   const [defaultPrompts, setDefaultPrompts] = useState(false);
   const [cameraView, setCameraView] = useState(false);
+  const [generationMode, setGenerationMode] = useState<'fast' | 'standard'>('fast');
   const [seed, setSeed] = useState(-1);
-  const [outputCount, setOutputCount] = useState(4);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -248,6 +248,7 @@ export const QwenMultiAnglesPage = () => {
   };
 
   const pollResults = async (promptId: string) => {
+    const expectedCount = generationMode === 'fast' ? 1 : 6;
     const started = Date.now();
     while (Date.now() - started < 240_000) {
       const res = await fetch(`${BACKEND_API.BASE_URL}/api/generate/status/${encodeURIComponent(promptId)}`);
@@ -262,16 +263,16 @@ export const QwenMultiAnglesPage = () => {
           (img: any) =>
             `/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder ?? '')}&type=${encodeURIComponent(img.type ?? 'output')}`,
         );
-        setResults(urls.slice(0, Math.max(1, Math.min(6, outputCount))));
+        setResults(urls.slice(0, expectedCount));
         return;
       }
       if (state === 'not_found' || state === 'pending' || state === 'running') {
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, 900));
         continue;
       }
       throw new Error(`Unexpected status: ${state}`);
     }
-    throw new Error('Generation timed out');
+    throw new Error(`Generation timed out (${generationMode === 'fast' ? 'Fast' : 'Standard'} mode)`);
   };
 
   const generate = async () => {
@@ -284,7 +285,7 @@ export const QwenMultiAnglesPage = () => {
     try {
       const chosenSeed = seed < 0 ? Math.floor(Math.random() * 2_147_483_000) : seed;
       const payload = {
-        workflow_id: 'qwen-multi-angles',
+        workflow_id: generationMode === 'fast' ? 'qwen-multi-angles-fast' : 'qwen-multi-angles',
         params: {
           image: uploadedImageName,
           horizontal_angle: toWorkflowHorizontalAngle(horizontalAngle),
@@ -305,7 +306,7 @@ export const QwenMultiAnglesPage = () => {
         throw new Error(data?.detail || data?.error || 'Failed to start generation');
       }
       await pollResults(String(data.prompt_id));
-      toast('Multi-angle generation complete', 'success');
+      toast(`Multi-angle generation complete (${generationMode === 'fast' ? 'Fast' : 'Standard'})`, 'success');
     } catch (err: any) {
       toast(err?.message || 'Generation failed', 'error');
     } finally {
@@ -364,6 +365,21 @@ export const QwenMultiAnglesPage = () => {
               </label>
             </div>
             {uploadedImageName && <p className="mt-2 text-[11px] text-emerald-300">Loaded: {uploadedImageName}</p>}
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+            <label className="text-[11px] uppercase tracking-[0.12em] text-slate-400 block mb-1">Render Mode</label>
+            <select
+              value={generationMode}
+              onChange={(e) => setGenerationMode(e.target.value === 'standard' ? 'standard' : 'fast')}
+              className="w-full rounded border border-white/10 bg-black/50 px-2 py-2 text-sm text-slate-100"
+            >
+              <option value="fast">Fast (1 output, quickest)</option>
+              <option value="standard">Standard (6 outputs, slower)</option>
+            </select>
+            <p className="mt-2 text-[10px] text-slate-500">
+              First run after ComfyUI startup is slower due model warmup.
+            </p>
           </div>
 
           <div className="rounded-xl border border-fuchsia-500/35 bg-[#0d0b12] p-3">
@@ -564,7 +580,7 @@ export const QwenMultiAnglesPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <label className="text-[11px] text-slate-400">
               Seed
               <input
@@ -573,16 +589,6 @@ export const QwenMultiAnglesPage = () => {
                 onChange={(e) => setSeed(Number(e.target.value))}
                 className="mt-1 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-slate-100"
               />
-            </label>
-            <label className="text-[11px] text-slate-400">
-              Output Count
-              <select
-                value={outputCount}
-                onChange={(e) => setOutputCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
-                className="mt-1 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-slate-100"
-              >
-                {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
             </label>
           </div>
 
