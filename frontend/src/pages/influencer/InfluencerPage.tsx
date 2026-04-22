@@ -258,6 +258,13 @@ function randomSeed(): number {
   return Math.floor(Math.random() * 2_147_483_000);
 }
 
+function normalizeHorizontalAngleForWorkflow(angle: number): number {
+  let normalized = Number.isFinite(angle) ? Math.round(angle) : 0;
+  while (normalized > 180) normalized -= 360;
+  while (normalized < -180) normalized += 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 function toViewUrl(image: GenerateImage): string {
   return `/comfy/view?filename=${encodeURIComponent(image.filename)}&subfolder=${encodeURIComponent(image.subfolder ?? '')}&type=${encodeURIComponent(image.type ?? 'output')}`;
 }
@@ -628,7 +635,7 @@ export const InfluencerPage = () => {
         image: job.base_image_ref,
         character_lock_text: job.character_lock_text,
         loras: normalizeLoraPayload(job.lora_slots),
-        horizontal_angle: job.multi_angle.horizontal_angle,
+        horizontal_angle: normalizeHorizontalAngleForWorkflow(job.multi_angle.horizontal_angle),
         vertical_angle: job.multi_angle.vertical_angle,
         zoom: job.multi_angle.zoom,
         default_prompts: job.multi_angle.default_prompts,

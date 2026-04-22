@@ -84,6 +84,11 @@ function describeVertical(angle: number): string {
   return `low-angle ${Math.abs(angle)} deg`;
 }
 
+function toWorkflowHorizontalAngle(angle: number): number {
+  const normalized = normalizeDegrees(angle);
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 export const QwenMultiAnglesPage = () => {
   const { toast } = useToast();
   const wheelRef = useRef<HTMLDivElement | null>(null);
@@ -282,7 +287,7 @@ export const QwenMultiAnglesPage = () => {
         workflow_id: 'qwen-multi-angles',
         params: {
           image: uploadedImageName,
-          horizontal_angle: horizontalAngle,
+          horizontal_angle: toWorkflowHorizontalAngle(horizontalAngle),
           vertical_angle: verticalAngle,
           zoom,
           default_prompts: defaultPrompts,
